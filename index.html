@@ -39,6 +39,37 @@
     td.num{ text-align:right }
     .status{font-size:12px;color:#475467;margin-top:8px}
     .error{color:#b42318;background:#fef3f2;border:1px solid #fed7d7;padding:8px;border-radius:8px;margin-top:8px}
+
+    /* ---------- Whiteout hot-fix guardrails (copy site only) ---------- */
+    /* Ensure primary output is always visible and readable */
+    #form-output, #custom-output, #gpt-output, .recipe-output {
+      opacity: 1 !important;
+      visibility: visible !important;
+      filter: none !important;
+      color: #111 !important;
+      background: #fff !important;
+    }
+    #form-output pre, #custom-output pre,
+    #gpt-output pre, .recipe-output pre,
+    #form-output code, #custom-output code,
+    #gpt-output code, .recipe-output code {
+      background: #f6f8fa !important;
+      color: #111 !important;
+      white-space: pre-wrap !important;
+      word-wrap: break-word !important;
+    }
+    /* Kill common overlays/backdrops if they linger */
+    .bp-overlay, .overlay, .backdrop, .screen, .loading-overlay {
+      display: none !important;
+      opacity: 0 !important;
+      pointer-events: none !important;
+    }
+    /* If a "loading" class is applied globally, don't hide results */
+    body.loading #form-output,
+    body.bp-loading #form-output {
+      opacity: 1 !important;
+      visibility: visible !important;
+    }
   </style>
 </head>
 <body>
@@ -59,7 +90,7 @@
         <button onclick="generateFromCustom()">Generate Recipes</button>
         <button class="ghost" type="button" onclick="clearCustomSection()">Clear Custom</button>
       </div>
-      <pre id="custom-output"></pre>
+      <pre id="custom-output" aria-live="polite"></pre>
     </section>
 
     <!-- B) Build From Ingredients -->
@@ -108,6 +139,9 @@
 
       <div id="status" class="status"></div>
 
+      <!-- Fixed, dedicated output container (pre-existing in DOM) -->
+      <pre id="form-output" class="recipe-output" aria-live="polite"></pre>
+
       <!-- Nutrition table & coaching -->
       <div id="nutrition-root" class="card" style="display:none"></div>
     </section>
@@ -122,7 +156,7 @@
     // =========================
     const CFG = {
       generateEndpoint: '/.netlify/functions/generate',
-      enableNutrition: false,  // <<<<<<<<<<  OFF for now (turn to true when you want tables)
+      enableNutrition: false,  // OFF for now (turn true when you want tables)
       datasets: {
         categories:          'data/categories.csv',
         diet_tool:           'data/diet_tool.csv',
@@ -278,7 +312,6 @@
     const DATA = { loaded:false, byKey:Object.create(null) };
     function norm(s){ return String(s||'').trim().toLowerCase(); }
     function first(obj, names){ for (const n of names){ if (n in obj && obj[n]!=null && obj[n]!=='' ) return obj[n]; } }
-    function pickKey(row){ return first(row,['Ingredient','Food','Item','Name']); }
     function applyMap(target, row, map){
       for (const [canon, options] of Object.entries(map)){
         const val = first(row, options);
@@ -315,9 +348,9 @@
         if (!path) continue;
         const rows = await loadCSV(path);
         for (const row of rows){
-          const k = pickKey(row); if (!k) continue;
-          const id = norm(k);
-          const rec = (DATA.byKey[id] ||= {});
+          const idKey = (String(first(row, ['Ingredient','Food','Item','Name'])||'')).trim().toLowerCase();
+          if (!idKey) continue;
+          const rec = (DATA.byKey[idKey] ||= {});
           mergeRow(rec, row);
           const m = FILE_MAP[key];
           if (m) applyMap(rec, row, m.maps||{});
@@ -337,7 +370,7 @@
     function getRowsFor(ingredients){
       const rows = [];
       for (const name of ingredients){
-        const rec = DATA.byKey[norm(name)];
+        const rec = DATA.byKey[(String(name).trim().toLowerCase())];
         if (rec) rows.push({ Ingredient: rec.Ingredient || name, ...rec });
       }
       return rows;
@@ -412,6 +445,7 @@ Request: ${custom || 'Chef’s choice within brain-healthy constraints.'}`;
       try{
         const text = await callOpenAI([{ role:'system', content: sys }, { role:'user', content: user }]);
         out.textContent = text || '(no text)';
+        document.dispatchEvent(new CustomEvent('bp:recipe:rendered'));
       }catch(err){ out.textContent = 'Error: ' + err.message; }
     }
 
@@ -435,8 +469,7 @@ Request: ${custom || 'Chef’s choice within brain-healthy constraints.'}`;
       const form = collectForm();
       document.getElementById('form-preview').textContent = buildPreviewText(form);
 
-      const out = document.getElementById('form-output') || document.createElement('pre');
-      if (!out.id){ out.id='form-output'; out.className='card'; document.querySelector('main').appendChild(out); }
+      const out = document.getElementById('form-output');
       out.textContent = 'Generating...';
 
       try {
@@ -456,6 +489,7 @@ ${goals}`;
         // 1) Recipe text
         const text = await callOpenAI([{ role:'system', content: sys }, { role:'user', content: user }]);
         out.textContent = text || '(no text)';
+        document.dispatchEvent(new CustomEvent('bp:recipe:rendered'));
 
         // 2) Nutrition & coaching (only if enabled)
         await ensureDataLoaded();
@@ -471,10 +505,7 @@ ${goals}`;
         ));
         setStatus('Done.');
       } catch(err){
-        out.textContent = '';
-        const errBox = el('div',{class:'error'}, 'Error during generation: ', String(err?.message || err));
-        out.replaceWith(errBox);
-        errBox.id='form-output';
+        out.textContent = 'Error: ' + (err?.message || err);
         console.error(err);
         setStatus('Error.');
       }
@@ -497,6 +528,19 @@ ${goals}`;
 
       // Hide nutrition area initially if feature disabled
       renderNutritionTable([]);
+
+      // Whiteout safety: clear any lingering loading/overlay classes after mount
+      setTimeout(function () {
+        document.body.classList.remove('loading','bp-loading');
+        const stuck = document.querySelectorAll('.overlay,.bp-overlay,.backdrop,.screen,.loading-overlay');
+        stuck.forEach(el => { el.style.display='none'; el.style.opacity='0'; el.style.pointerEvents='none'; });
+      }, 800);
+
+      // Scroll to output when rendered
+      document.addEventListener('bp:recipe:rendered', function(){
+        const el = document.getElementById('form-output');
+        if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
     })();
 
     // Export handlers
