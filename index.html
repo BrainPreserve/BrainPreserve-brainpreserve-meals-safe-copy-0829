@@ -20,7 +20,8 @@
     button.ghost{border-color:#d0d5dd;background:#fff;color:#111}
     button:disabled{opacity:.6;cursor:not-allowed}
     .btn-row{display:flex;gap:10px;flex-wrap:wrap}
-    pre{white-space:pre-wrap;background:#0b0b0b;color:#e8e8e8;padding:14px;border-radius:12px;min-height:48px;margin-top:12px;border:1px solid #0f172a}
+    /* HIGH CONTRAST recipe/coaching output */
+    pre{white-space:pre-wrap;background:#ffffff;color:#111111;padding:14px;border-radius:12px;min-height:48px;margin-top:12px;border:1px solid #e5e7eb}
     .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
     @media (max-width:860px){.grid{grid-template-columns:1fr}}
     .accordion{border:1px dashed #d6d6d6;border-radius:12px;margin:10px 0;overflow:hidden;background:#fff}
@@ -108,7 +109,7 @@
       <div id="status" class="status"></div>
 
       <!-- Nutrition table & coaching -->
-      <div id="nutrition-root" class="card"></div>
+      <div id="nutrition-root" class="card" style="display:none"></div>
     </section>
   </main>
 
@@ -121,6 +122,7 @@
     // =========================
     const CFG = {
       generateEndpoint: '/.netlify/functions/generate',
+      enableNutrition: false,  // <<<<<<<<<<  OFF for now (turn to true when you want tables)
       datasets: {
         categories:          'data/categories.csv',
         diet_tool:           'data/diet_tool.csv',
@@ -186,7 +188,7 @@
     }
     function setStatus(msg){ const s=document.getElementById('status'); if(s) s.textContent = msg; }
 
-    // Checkbox renderer that avoids CSS.escape: use data-cat
+    // Checkbox renderer
     function renderIncludeAccordions(){
       const root = document.getElementById('include-root');
       root.innerHTML = '';
@@ -222,14 +224,11 @@
     }
 
     function getSelectedByCat(){
-      // Gather selections using data-cat (no CSS.escape)
       const inputs = document.querySelectorAll('input[type=checkbox][data-cat]');
       const out = {};
       inputs.forEach(i=>{
         const cat = i.getAttribute('data-cat');
-        if (i.checked){
-          (out[cat] ||= []).push(i.value);
-        }
+        if (i.checked){ (out[cat] ||= []).push(i.value); }
       });
       return out;
     }
@@ -274,14 +273,11 @@
     }
 
     // =========================
-    // CSV LOADING & MERGE
+    // CSV LOADING & MERGE (used only if CFG.enableNutrition = true)
     // =========================
     const DATA = { loaded:false, byKey:Object.create(null) };
     function norm(s){ return String(s||'').trim().toLowerCase(); }
-    function first(obj, names){
-      for (const n of names){ if (n in obj && obj[n]!=null && obj[n]!=='' ) return obj[n]; }
-      return undefined;
-    }
+    function first(obj, names){ for (const n of names){ if (n in obj && obj[n]!=null && obj[n]!=='' ) return obj[n]; } }
     function pickKey(row){ return first(row,['Ingredient','Food','Item','Name']); }
     function applyMap(target, row, map){
       for (const [canon, options] of Object.entries(map)){
@@ -298,7 +294,7 @@
       fiber:         { maps:{ Fiber_g:['Fiber (g)','Fiber_g','Fiber','g_fiber'] } },
       gi_gl:         { maps:{ GI:['GI','Glycemic Index'], GL:['GL','Glycemic Load'] } },
       microbiome:    { maps:{ MicrobiomeScore:['Microbiome Benefit Score','Microbiome Benefit','Microbiome_Score'] } },
-      micronutrients_food: { maps:{ Micronutrients:['Key Micronutrients','Micronutrients','Top Micronutrients'] } },
+      micronutrients_food:{ maps:{ Micronutrients:['Key Micronutrients','Micronutrients','Top Micronutrients'] } },
       categories:    { maps:{ DietTags:['Diet Tags','Tags','Category','Categories'] } },
       diet_tool:     { maps:{ DII:['DII Score','Anti-Inflammatory/DII Score (lower is better)','DII','anti_inflammatory_dii'] } },
       moder:         { maps:{ DII:['DII Score','Anti-Inflammatory/DII Score (lower is better)','DII','anti_inflammatory_dii'] } },
@@ -311,6 +307,7 @@
       });
     }
     async function ensureDataLoaded(){
+      if (!CFG.enableNutrition) return;  // skip entirely when disabled
       if (DATA.loaded) return;
       const order = ['main','protein','fiber','gi_gl','microbiome','micronutrients_food','categories','diet_tool','moder'];
       for (const key of order){
@@ -346,10 +343,12 @@
       return rows;
     }
     function renderNutritionTable(rows){
-      const root = document.getElementById('nutrition-root');
-      root.innerHTML = '';
+      const box = document.getElementById('nutrition-root');
+      if (!CFG.enableNutrition){ box.style.display='none'; box.innerHTML=''; return; }
+      box.style.display='block';
+      box.innerHTML = '';
       if (!rows.length){
-        root.appendChild(el('p',{class:'muted'},'No nutrition data found for your selections.'));
+        box.appendChild(el('p',{class:'muted'},'No nutrition data found for your selections.'));
         return;
       }
       const table = el('table', {});
@@ -382,7 +381,7 @@
         ));
       });
       table.appendChild(thead); table.appendChild(tbody);
-      root.appendChild(table);
+      box.appendChild(table);
     }
     function coachingFromGoals(goals){
       const tips = [];
@@ -425,15 +424,14 @@ Request: ${custom || 'Chef’s choice within brain-healthy constraints.'}`;
     function clearFormSelections(){
       document.querySelectorAll('.checks input[type=checkbox]').forEach(i => { i.checked = false; });
       document.getElementById('form-preview').textContent = 'No selections yet.';
-      document.getElementById('nutrition-root').innerHTML = '';
+      renderNutritionTable([]); // also hides when disabled
       const out = document.getElementById('form-output'); if (out) out.textContent = '';
       setStatus('');
     }
 
     async function generateFromSelections(){
-      setStatus('Clicked — working…');
+      setStatus('Working…');
 
-      // Force preview to update immediately (even if change event was missed)
       const form = collectForm();
       document.getElementById('form-preview').textContent = buildPreviewText(form);
 
@@ -455,26 +453,23 @@ ${selLines || '(none)'}
 ${exc}
 ${goals}`;
 
-        // 1) Recipe text via function
+        // 1) Recipe text
         const text = await callOpenAI([{ role:'system', content: sys }, { role:'user', content: user }]);
         out.textContent = text || '(no text)';
 
-        // 2) Nutrition & coaching from CSVs
+        // 2) Nutrition & coaching (only if enabled)
         await ensureDataLoaded();
         const picked = getSelectedIngredients(form);
-        const rows = getRowsFor(picked);
+        const rows = CFG.enableNutrition ? getRowsFor(picked) : [];
         renderNutritionTable(rows);
 
         const tips = coachingFromGoals(form.goals || []);
         const nroot = document.getElementById('nutrition-root');
-        if (tips.length){
-          nroot.appendChild(el('div', { class:'card', style:'margin-top:12px' },
+        if (CFG.enableNutrition) nroot.appendChild(el('div', { class:'card', style:'margin-top:12px' },
             el('h4', {}, 'Goal-Aligned Coaching (deterministic rules)'),
             el('ul', {}, ...tips.map(t=>el('li', {}, t)))
-          ));
-        }
+        ));
         setStatus('Done.');
-
       } catch(err){
         out.textContent = '';
         const errBox = el('div',{class:'error'}, 'Error during generation: ', String(err?.message || err));
@@ -493,16 +488,18 @@ ${goals}`;
       renderChecks('exc-categories', EXCLUDE_CATEGORIES);
       renderChecks('goals', GOALS);
 
-      // Live preview on change (but we also force-update on Generate)
       document.body.addEventListener('change', (e)=>{
         if(e.target.closest('.checks')){
           const form = collectForm();
           document.getElementById('form-preview').textContent = buildPreviewText(form);
         }
       });
+
+      // Hide nutrition area initially if feature disabled
+      renderNutritionTable([]);
     })();
 
-    // Export handlers so onclick always finds them
+    // Export handlers
     window.generateFromSelections = generateFromSelections;
     window.generateFromCustom     = generateFromCustom;
     window.clearFormSelections    = clearFormSelections;
