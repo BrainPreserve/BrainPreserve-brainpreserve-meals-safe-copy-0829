@@ -1,0 +1,8 @@
+Diet Name,Component,Category,Recommended Intake,Scoring Rule
+MODERN,Olive oil,Adequacy,>0 servings/day,"1 if >0, else 0"
+MODERN,Green leafy vegetables,Moderation,0–1.5 servings/day,"1 if within range, else 0"
+MODERN,Berries & citrus fruits,Moderation,0–2 servings/day,"1 if within range, else 0"
+MODERN,Potatoes,Moderation,0–0.75 servings/day,"1 if within range, else 0"
+MODERN,Eggs,Moderation,0–1 serving/day,"1 if within range, else 0"
+MODERN,Poultry,Moderation,0–0.5 servings/day,"1 if within range, else 0"
+MODERN,Sweetened beverages,Restriction,0 servings/day,"1 if 0, else 0"
