@@ -14,7 +14,7 @@
     .subtitle{color:#475467;margin:0 0 12px}
     .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:18px;box-shadow:0 4px 14px rgba(0,0,0,.04);margin:18px 0}
     textarea{width:100%;padding:12px;border:1px solid #d0d5dd;border-radius:12px}
-    .row{display:flex;align-items:center;gap:10px;margin:10px 0}
+    .row{display:flex;align-items:center;gap:10px;margin:10px 0;flex-wrap:wrap}
     input[type="number"]{width:120px;padding:10px;border:1px solid #d0d5dd;border-radius:12px}
     button{padding:10px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:12px;cursor:pointer}
     button.ghost{border-color:#d0d5dd;background:#fff;color:#111}
@@ -33,7 +33,7 @@
     .muted{color:#667085;font-size:13px;margin:0 0 6px}
     table{width:100%; border-collapse:collapse; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden}
     th, td{padding:10px; border-bottom:1px solid #f1f5f9}
-    thead tr{background:#f9fafb}
+    thead tr{background:#f9f9fb}
     th{ text-align:left; vertical-align:top; white-space:normal; word-wrap:break-word }
     td.num{ text-align:right }
     .status{font-size:12px;color:#475467;margin-top:8px}
@@ -47,7 +47,6 @@
     .bp5stack h3{ margin:18px 0 8px 0; }
     .bp-footnote{ color:#667085; font-size:12px; margin:-6px 0 12px 0; }
     .bp-after{ margin-top:10px; }
-    .csv-ok{ color:#0a7f2e; }
   </style>
 </head>
 <body>
@@ -58,11 +57,11 @@
     <!-- A) Custom Request -->
     <section class="card">
       <h2>Custom Request</h2>
-      <p>Example: “Make 3 dinners with salmon and legumes, dairy-free, low sodium.” Leave the number blank to default to 3–5 recipes.</p>
+      <p>Example: “Make 3 dinners with salmon and legumes, dairy-free, low sodium.” Leave the number blank to default to 5 recipes.</p>
       <textarea id="custom-input" rows="4" placeholder="Describe the meal(s) you want..."></textarea>
       <div class="row">
         <label for="num-recipes">Number of recipes (optional):</label>
-        <input id="num-recipes" type="number" min="1" max="10" placeholder="3–5" />
+        <input id="num-recipes" type="number" min="1" max="10" placeholder="5" />
       </div>
       <div class="btn-row">
         <button onclick="generateFromCustom()">Generate Recipes</button>
@@ -105,6 +104,12 @@
               <div class="checks" id="goals"></div>
             </div>
           </div>
+
+          <!-- NEW: number of recipes for the selector -->
+          <div class="row">
+            <label for="num-recipes-form">Number of recipes (optional):</label>
+            <input id="num-recipes-form" type="number" min="1" max="10" placeholder="5" />
+          </div>
         </div>
       </div>
 
@@ -117,9 +122,8 @@
       </div>
 
       <div id="status" class="status"></div>
-      <div id="csv-status" class="status"></div>
 
-      <!-- Legacy single-table area (kept for compatibility) -->
+      <!-- (kept for compatibility; tables are injected near outputs) -->
       <div id="nutrition-root" class="card" style="display:none"></div>
     </section>
   </main>
@@ -133,7 +137,7 @@
     // =========================
     const CFG = {
       generateEndpoint: '/.netlify/functions/generate',
-      enableNutrition: true,  // ON: inject 5 tables per recipe
+      enableNutrition: true,  // inject 5 tables per recipe
       datasets: {
         categories:          'data/categories.csv',
         diet_tool:           'data/diet_tool.csv',
@@ -258,7 +262,9 @@
       });
       const exclusions = getSelected('exc-categories');
       const goals = getSelected('goals');
-      return { selections, exclusions, goals };
+      const numForm = parseInt($('#num-recipes-form')?.value, 10);
+      const count = Number.isFinite(numForm) && numForm > 0 ? Math.min(numForm, 10) : 5; // default to 5
+      return { selections, exclusions, goals, count };
     }
     function buildPreviewText(data){
       const parts = [];
@@ -267,6 +273,7 @@
       }
       if (data.exclusions?.length) parts.push(`Exclude categories: ${data.exclusions.join(', ')}`);
       if (data.goals?.length) parts.push(`Goals: ${data.goals.join(', ')}`);
+      parts.push(`Number of recipes: ${data.count}`);
       return parts.length ? parts.join('\n') : 'No selections yet.';
     }
 
@@ -285,7 +292,7 @@
     }
 
     // =========================
-    // CSV LOADING + 5-TABLE ENGINE
+    // CSV LOADING + 5-TABLE ENGINE (abridged but robust)
     // =========================
     const DATA = { ready:false, rows:0, db:Object.create(null) };
     const COLS = {
@@ -329,7 +336,6 @@
     }
     async function ensureDataLoaded(){
       if (!CFG.enableNutrition || DATA.ready) return;
-      let total=0;
       for (const path of Object.values(CFG.datasets)){
         const rows = await loadCSV(path);
         for (const r0 of rows){
@@ -337,7 +343,7 @@
           const name = pick(r, COLS.ingredient) || r[Object.keys(r)[0]];
           if (!name) continue;
           const key = toKey(canonical(name));
-          const dst = (DATA.db[key] ||= { _name:name, _rows:[] }); dst._rows.push(r); total++;
+          const dst = (DATA.db[key] ||= { _name:name, _rows:[] }); dst._rows.push(r); DATA.rows++;
 
           const fields = [
             ['calories',COLS.calories],['protein_g',COLS.protein_g],['fiber_g',COLS.fiber_g],
@@ -354,29 +360,21 @@
           }
         }
       }
-      DATA.rows = total; DATA.ready=true;
-      const cs = $('#csv-status'); if (cs) cs.innerHTML = `<span class="csv-ok">CSV data loaded.</span> Rows indexed: ${total}`;
+      DATA.ready=true;
     }
 
-    // ---------- Robust recipe text parser ----------
+    // ---------- Parse GPT text for recipes ----------
     function normLine(s){
       return String(s||'')
-        .replace(/[*_`~>#]/g,'')        // strip markdown symbols ** __ ## etc.
-        .replace(/\u2022/g,'-')         // • -> -
+        .replace(/[*_`~>#]/g,'')
+        .replace(/\u2022/g,'-')
         .replace(/\r/g,'')
         .trim();
     }
-    function isIngredientsLine(s){
-      const t = normLine(s).toLowerCase();
-      return /^ingredients?\b/.test(t); // matches "Ingredients", "Ingredients:" etc.
-    }
+    function isIngredientsLine(s){ return /^ingredients?\b/.test(normLine(s).toLowerCase()); }
     function isStopLine(s){
       const t = normLine(s).toLowerCase();
-      return !t ||
-             /^instructions?\b/.test(t) ||
-             /^method\b/.test(t) ||
-             /^directions?\b/.test(t) ||
-             /^notes?\b/.test(t);
+      return !t || /^instructions?\b/.test(t) || /^method\b/.test(t) || /^directions?\b/.test(t) || /^notes?\b/.test(t);
     }
     function likelyTitle(s){
       const t = normLine(s);
@@ -386,11 +384,8 @@
       const rawLines = String(txt||'').split('\n');
       const lines = rawLines.map(normLine);
       const recipes=[];
-
       for (let i=0;i<lines.length;i++){
         if (!isIngredientsLine(lines[i])) continue;
-
-        // backtrack for a title within last 3 non-empty lines
         let title = null;
         for (let k=i-1, seen=0; k>=0 && seen<3; k--){
           if (!lines[k]) continue;
@@ -398,37 +393,26 @@
           seen++;
         }
         if (!title) title = `Recipe ${recipes.length+1}`;
-
-        // collect bullet-like lines until a stop line or next section
         const items=[];
         for (let j=i+1; j<lines.length; j++){
           const L = lines[j];
           if (isStopLine(L)) break;
-          // accept bullets, dashes, or quantity-first lines
-          if (/^\s*(-|\*|\d+\.)\s*/.test(rawLines[j]) || /^[\d\/\.]+\s*[a-zA-Zµ]*/.test(L) || /^[A-Za-z]/.test(L)){
+          if (/^\s*(-|\*|\d+\.)\s*/.test(rawLines[j]) || /^[\d\/\.\,]+\s*[a-zA-Zµ]*\s+/.test(L) || /^[A-Za-z]/.test(L)){
             if (L.length>0) items.push(L);
-          } else if (!L) {
-            break;
-          } else {
-            // reached something that looks like next heading/title
-            if (/^[A-Z]/.test(L)) break;
-          }
+          } else if (!L) break; else if (/^[A-Z]/.test(L)) break;
         }
         if (items.length) recipes.push({ title, ingredients: items });
       }
-      // ensure max 5 per your spec
-      return recipes.slice(0,5);
+      return recipes;
     }
 
-    // ---------- Build 5 tables ----------
+    // ---------- Build & inject the 5 tables ----------
     function attachByName(recName){
       const key = toKey(canonical(recName));
       return DATA.db[key] || { _name: recName };
     }
     function buildTablesForIngredients(list){
-      // normalize names and alphabetize
       const rows = list.map(raw=>{
-        // extract name after amount/unit if present
         const m = raw.match(/^([\d\/\.\,\s\-]+)?\s*([a-zA-Zµ]+)?\s*(.*)$/);
         const namePart = m ? (m[3]||raw) : raw;
         const rec = attachByName(namePart);
@@ -443,7 +427,6 @@
       const t5 = buildMicronutrientBenefitsTable(rows);
       return `<div class="bp5stack">${t1}${t2}${t3}${t4}${t5}</div>`;
     }
-
     function buildNutritionTable(rows){
       let totCal=0, totProt=0, totFib=0, totGL=0;
       const body = rows.map(r=>{
@@ -492,7 +475,6 @@
           </thead>
           <tbody>${body}${totals}</tbody>
         </table>
-        <div class="bp-footnote">Totals sum Calories, Protein, Fiber, and GL. GI and DII are not additive.</div>
       `;
     }
     function buildCogTable(rows){
@@ -574,7 +556,7 @@
           </thead>
           <tbody>${body}</tbody>
         </table>
-        <div class="bp-footnote">%RDA is shown when present/derivable in your CSVs; otherwise “N/A”.</div>
+        <div class="bp-footnote">%RDA shown when present/derivable in your CSVs; otherwise “N/A”.</div>
       `;
     }
     function estimatePercentRDA(rec){
@@ -598,7 +580,6 @@
       if (!CFG.enableNutrition || !preEl) return;
       await ensureDataLoaded();
 
-      // remove previous stack if any
       if (preEl.nextElementSibling && preEl.nextElementSibling.classList?.contains('bp-after')){
         preEl.nextElementSibling.remove();
       }
@@ -628,16 +609,16 @@
     }
 
     // =========================
-    // PUBLIC HANDLERS (unchanged UX)
+    // PUBLIC HANDLERS
     // =========================
     async function generateFromCustom(){
       setStatus('');
-      const out = document.getElementById('custom-output');
-      const custom = document.getElementById('custom-input').value.trim();
-      const num = parseInt(document.getElementById('num-recipes').value, 10);
-      const count = Number.isFinite(num) ? num : undefined;
+      const out = $('#custom-output');
+      const custom = $('#custom-input').value.trim();
+      const numRaw = parseInt($('#num-recipes').value, 10);
+      const count = Number.isFinite(numRaw) && numRaw>0 ? Math.min(numRaw,10) : 5; // default 5
 
-      const sys = `You are BrainPreserve’s recipe engine. Generate exactly ${count||5} brain-healthy recipes. For each recipe, include a clear heading and a heading "Ingredients" followed by a bullet list of ingredients with amounts. Keep formatting simple (markdown bullets).`;
+      const sys = `You are BrainPreserve’s recipe engine. Generate exactly ${count} brain-healthy recipes. For each recipe, include a heading and a heading "Ingredients" followed by a bullet list of ingredients with amounts (markdown bullets). Keep formatting simple.`;
       const user = `Request: ${custom || 'Chef’s choice within brain-healthy constraints.'}`;
 
       out.textContent = 'Generating...';
@@ -649,17 +630,21 @@
     }
 
     function clearCustomSection(){
-      document.getElementById('custom-input').value = '';
-      document.getElementById('num-recipes').value = '';
-      const pre = document.getElementById('custom-output');
+      $('#custom-input').value = '';
+      $('#num-recipes').value = '';
+      const pre = $('#custom-output');
       pre.textContent = '';
       if (pre.nextElementSibling && pre.nextElementSibling.classList?.contains('bp-after')) pre.nextElementSibling.remove();
     }
 
     function clearFormSelections(){
       document.querySelectorAll('.checks input[type=checkbox]').forEach(i => { i.checked = false; });
-      document.getElementById('form-preview').textContent = 'No selections yet.';
-      const out = document.getElementById('form-output'); if (out) out.remove();
+      $('#num-recipes-form').value = '';
+      $('#form-preview').textContent = 'No selections yet.';
+      const out = $('#form-output'); if (out) out.remove();
+      // remove any injected stacks that might follow form-output
+      const pre = $('#form-output');
+      if (pre && pre.nextElementSibling && pre.nextElementSibling.classList?.contains('bp-after')) pre.nextElementSibling.remove();
       setStatus('');
     }
 
@@ -667,9 +652,9 @@
       setStatus('Working…');
 
       const form = collectForm();
-      document.getElementById('form-preview').textContent = buildPreviewText(form);
+      $('#form-preview').textContent = buildPreviewText(form);
 
-      let out = document.getElementById('form-output');
+      let out = $('#form-output');
       if (!out){ out = document.createElement('pre'); out.id='form-output'; out.className='card'; document.querySelector('main').appendChild(out); }
       out.textContent = 'Generating...';
 
@@ -681,7 +666,7 @@
         const exc = form.exclusions?.length ? `Exclude categories: ${form.exclusions.join(', ')}` : '';
         const goals = form.goals?.length ? `Goals: ${form.goals.join(', ')}` : '';
 
-        const sys = `You are BrainPreserve’s recipe engine. Use the provided selections, respect exclusions strictly, tailor to the listed goals, and return exactly 5 recipes. For each recipe, include a heading and a heading "Ingredients" followed by a bullet list of ingredients with amounts (markdown bullets).`;
+        const sys = `You are BrainPreserve’s recipe engine. Use the provided selections, respect exclusions strictly, tailor to the listed goals, and return exactly ${form.count} recipes. For each recipe, include a heading and a heading "Ingredients" followed by a bullet list of ingredients with amounts (markdown bullets).`;
         const user = `Selections:\n${selLines || '(none)'}\n${exc}\n${goals}`;
 
         const text = await callOpenAI([{ role:'system', content: sys }, { role:'user', content: user }]);
@@ -708,10 +693,9 @@
       document.body.addEventListener('change', (e)=>{
         if(e.target.closest('.checks')){
           const form = collectForm();
-          document.getElementById('form-preview').textContent = buildPreviewText(form);
+          $('#form-preview').textContent = buildPreviewText(form);
         }
       });
-      // Preload CSVs and show status
       await ensureDataLoaded();
     })();
 
