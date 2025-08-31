@@ -68,7 +68,6 @@
         <button class="ghost" type="button" onclick="clearCustomSection()">Clear Custom</button>
       </div>
       <pre id="custom-output"></pre>
-      <!-- 5-table stacks appear directly beneath this pre -->
     </section>
 
     <!-- B) Build From Ingredients -->
@@ -105,7 +104,7 @@
             </div>
           </div>
 
-          <!-- NEW: number of recipes for the selector -->
+          <!-- Number of recipes for the selector -->
           <div class="row">
             <label for="num-recipes-form">Number of recipes (optional):</label>
             <input id="num-recipes-form" type="number" min="1" max="10" placeholder="5" />
@@ -122,8 +121,6 @@
       </div>
 
       <div id="status" class="status"></div>
-
-      <!-- (kept for compatibility; tables are injected near outputs) -->
       <div id="nutrition-root" class="card" style="display:none"></div>
     </section>
   </main>
@@ -137,7 +134,7 @@
     // =========================
     const CFG = {
       generateEndpoint: '/.netlify/functions/generate',
-      enableNutrition: true,  // inject 5 tables per recipe
+      enableNutrition: true,
       datasets: {
         categories:          'data/categories.csv',
         diet_tool:           'data/diet_tool.csv',
@@ -153,7 +150,7 @@
     };
 
     // =========================
-    // UI SOURCES (unchanged)
+    // UI SOURCES
     // =========================
     const STARTER_INGREDIENTS = {
       "Vegetables": ["GPT CHOOSES VEGETABLES","Arugula","Collard Greens","Kale","Mustard Greens","Romaine","Spinach","Swiss Chard","Broccoli","Brussel Sprouts","Cabbage","Cauliflower","Bell Peppers","Chili Peppers","Eggplant","Tomatoes","Beets","Carrots","Sweet Potatoes","Artichokes","Asparagus","Celery","Cucumber","Onions","Zucchini","Mushrooms","Cornmeal (whole grain)","Blue Corn","Sweet Corn","Grits (whole grain, cooked)","Heirloom Corn","Hominy Corn","Purple Corn","Polenta (cooked)"],
@@ -183,6 +180,7 @@
     // =========================
     // HELPERS
     // =========================
+    const $ = sel => document.querySelector(sel);
     function el(tag, attrs={}, ...children){
       const node = document.createElement(tag);
       Object.entries(attrs).forEach(([k,v])=>{
@@ -201,90 +199,42 @@
       const open = content.classList.toggle('open');
       header.setAttribute('aria-expanded', open ? 'true' : 'false');
     }
-    function setStatus(msg){ const s=document.getElementById('status'); if(s) s.textContent = msg; }
-    const $ = (sel)=>document.querySelector(sel);
+    function setStatus(msg){ const s=$('#status'); if(s) s.textContent = msg; }
 
-    // Checkbox renderer
-    function renderIncludeAccordions(){
-      const root = document.getElementById('include-root');
-      root.innerHTML = '';
-      Object.entries(STARTER_INGREDIENTS).forEach(([cat, items])=>{
-        const catSlug = slugify(cat);
-        const acc = el('div', { class:'accordion' });
-        const header = el('div', { class:'acc-header', role:'button', tabindex:'0', 'aria-expanded':'false', onclick:'toggleAccordion(this)' },
-          el('h4', {}, cat),
-          el('span', { class:'muted' }, 'Click to expand')
-        );
-        const content = el('div', { class:'acc-content' });
-        const list = el('div', { class:'checks' });
-        items.forEach(val=>{
-          const id = `inc-${catSlug}-${slugify(val)}`;
-          const input = el('input', { type:'checkbox', id, value:val, 'data-cat':catSlug });
-          const label = el('label', { for:id }, input, val);
-          list.appendChild(label);
-        });
-        content.appendChild(list);
-        acc.appendChild(header); acc.appendChild(content);
-        root.appendChild(acc);
-      });
+    // =========================
+    // NUMBER & DISH DETECTION (custom text)
+    // =========================
+    const NUMBER_WORDS = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};
+    function detectDesiredCount(text){
+      const t = (text||'').toLowerCase();
+      const m1 = t.match(/\b(?:make|generate|create|give|show)\s+(\d{1,2})\b/);
+      if (m1) return clamp(parseInt(m1[1],10));
+      const m2 = t.match(/\b(\d{1,2})\s+(?:recipes?|dishes?|meals?|ideas?|omelettes?|salads?|soups?)\b/);
+      if (m2) return clamp(parseInt(m2[1],10));
+      const m3 = t.match(/\b(?:make|generate|create)\s+(one|two|three|four|five|six|seven|eight|nine|ten)\b/);
+      if (m3) return clamp(NUMBER_WORDS[m3[1]]);
+      // pattern like "1 omelette"
+      const m4 = t.match(/\b(\d{1,2})\s+[a-z]/);
+      if (m4) return clamp(parseInt(m4[1],10));
+      return null;
     }
-
-    function renderChecks(containerId, items){
-      const root = document.getElementById(containerId); root.innerHTML = '';
-      items.forEach(v=>{
-        const id = `${containerId}-${slugify(v)}`;
-        const input = el('input', { type:'checkbox', id, value:v });
-        const label = el('label', { for:id }, input, v);
-        root.appendChild(label);
-      });
-    }
-
-    function getSelectedByCat(){
-      const inputs = document.querySelectorAll('input[type=checkbox][data-cat]');
-      const out = {};
-      inputs.forEach(i=>{
-        const cat = i.getAttribute('data-cat');
-        if (i.checked){ (out[cat] ||= []).push(i.value); }
-      });
-      return out;
-    }
-    function getSelected(containerId){
-      const root = document.getElementById(containerId);
-      const inputs = root ? root.querySelectorAll('input[type=checkbox]:checked') : [];
-      return Array.from(inputs).map(i=>i.value);
-    }
-
-    function collectForm(){
-      const selections = {};
-      Object.keys(STARTER_INGREDIENTS).forEach(cat=>{
-        const slug = slugify(cat);
-        selections[cat] = getSelectedByCat()[slug] || [];
-      });
-      const exclusions = getSelected('exc-categories');
-      const goals = getSelected('goals');
-      const numForm = parseInt($('#num-recipes-form')?.value, 10);
-      const count = Number.isFinite(numForm) && numForm > 0 ? Math.min(numForm, 10) : 5; // default to 5
-      return { selections, exclusions, goals, count };
-    }
-    function buildPreviewText(data){
-      const parts = [];
-      for (const [cat, list] of Object.entries(data.selections)) {
-        if (list && list.length) parts.push(`${cat}: ${list.join(', ')}`);
-      }
-      if (data.exclusions?.length) parts.push(`Exclude categories: ${data.exclusions.join(', ')}`);
-      if (data.goals?.length) parts.push(`Goals: ${data.goals.join(', ')}`);
-      parts.push(`Number of recipes: ${data.count}`);
-      return parts.length ? parts.join('\n') : 'No selections yet.';
+    function clamp(n){ return Math.max(1, Math.min(10, n)); }
+    function detectExplicitDish(text){
+      // common dish keyword extraction (first noun-like term after number or verbs)
+      const m = (text||'').toLowerCase().match(/\b(?:make|generate|create|cook|prepare)?\s*(?:\d+\s+)?([a-z][a-z\s\-]{2,})/);
+      if (!m) return null;
+      // take first 3 words, stop at punctuation
+      return m[1].split(/[.,;:]/)[0].trim();
     }
 
     // =========================
-    // OPENAI VIA NETLIFY FUNCTION (unchanged)
+    // OPENAI VIA NETLIFY FUNCTION
     // =========================
     async function callOpenAI(messages){
       const resp = await fetch(CFG.generateEndpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages, temperature: 0.4, max_tokens: 1200, model: 'gpt-4o-mini' })
+        body: JSON.stringify({ messages, temperature: 0.2, max_tokens: 1400, model: 'gpt-4o-mini' })
       });
       const data = await resp.json();
       if (!resp.ok) throw new Error(data?.error || ('HTTP '+resp.status));
@@ -292,9 +242,10 @@
     }
 
     // =========================
-    // CSV LOADING + 5-TABLE ENGINE (abridged but robust)
+    // CSV LOADING + ROBUST MATCHER
     // =========================
-    const DATA = { ready:false, rows:0, db:Object.create(null) };
+    const DATA = { ready:false, db:Object.create(null), keys:[] };
+
     const COLS = {
       ingredient:     ['Ingredient','Ingredients','Food','Item','Name','Food Name','Ingredient Name'],
       calories:       ['Calories','kcal','Calories_per_serving'],
@@ -313,21 +264,57 @@
       cog_benefits:   ['Cognitive Benefits & Mechanisms','Cognitive_Benefits','Cognition_Mechanisms'],
       other_benefits: ['Other Health Benefits','Other_Benefits']
     };
-    const POSSIBLE_DIETS = ['MIND','Mediterranean','DASH','LowGI','Pescetarian','Vegetarian','Vegan','Keto','Paleo','GlutenFree','DairyFree','AntiInflammatory','Modern'];
-    const NAME_ALIAS = {'extra virgin olive oil':'olive oil','ev olive oil':'olive oil','rolled oats':'oats','baby spinach':'spinach','greek yogurt':'yogurt','brown rice':'rice','wild salmon':'salmon','chickpeas':'garbanzo beans'};
+
+    const ALIAS = {
+      'extra virgin olive oil':'olive oil', 'ev olive oil':'olive oil', 'olive oil (extra virgin)':'olive oil',
+      'rolled oats':'oats', 'steel-cut oats':'oats', 'oat groats':'oats',
+      'baby spinach':'spinach', 'kale leaves':'kale',
+      'greek yogurt':'yogurt', 'plain yogurt':'yogurt',
+      'brown rice':'rice (brown)', 'wild salmon':'salmon',
+      'garbanzo beans':'chickpeas', 'chickpea':'chickpeas',
+      'egg':'eggs', 'large eggs':'eggs', 'pasture-raised eggs':'eggs'
+    };
 
     const esc = s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
     const toKey = s => (s||'').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9\s\-]/g,'').replace(/\s+/g,' ').trim();
-    const num = v => { if(v==null) return null; const x=parseFloat(String(v).replace(/[^\d\.\-]/g,'')); return Number.isFinite(x)?x:null; };
-    const fmt = (v,d=0) => (v==null || !Number.isFinite(v) ? 'N/A' : (d===0 ? String(Math.round(v)) : v.toFixed(d)));
-    const pick = (row, names) => { for (const n of names){ if(n in row && row[n]!=='' && row[n]!=null) return row[n]; } };
     function canonical(raw){
       let s = String(raw||'').toLowerCase();
-      s = s.replace(/\(.*?\)/g,'').replace(/\b(fresh|chopped|diced|minced|cooked|raw|organic|extra|virgin|ground|dry|dried|toasted|unsalted|salted|low\-fat|nonfat|skinless|boneless)\b/g,'');
-      s = s.replace(/\s+/g,' ').trim(); if (NAME_ALIAS[s]) s = NAME_ALIAS[s];
-      if (s.endsWith('s') && !s.endsWith('ss')) s = s.slice(0,-1);
+      s = s.replace(/\(.*?\)/g,'');
+      s = s.replace(/\b(free\-range|pasture\-raised|organic|fresh|large|small|medium|chopped|diced|minced|cooked|raw|extra|virgin|ground|dry|dried|toasted|unsalted|salted|skinless|boneless|low\-fat|nonfat)\b/g,'');
+      s = s.replace(/\s+/g,' ').trim();
+      if (ALIAS[s]) s = ALIAS[s];
+      if (s.endsWith('s') && !s.endsWith('ss')) s = s.slice(0,-1); // singularize
       return s;
     }
+    function tokenize(s){
+      return toKey(s).split(' ').filter(w=>w.length>2);
+    }
+    function jaccard(a,b){
+      const A=new Set(a), B=new Set(b);
+      const inter=[...A].filter(x=>B.has(x)).length;
+      const uni=new Set([...A,...B]).size;
+      return uni? inter/uni : 0;
+    }
+    function bestMatch(name){
+      // exact
+      const key = toKey(canonical(name));
+      if (DATA.db[key]) return {rec:DATA.db[key], score:1};
+
+      // alias direct
+      if (ALIAS[key] && DATA.db[toKey(ALIAS[key])]) return {rec:DATA.db[toKey(ALIAS[key])], score:0.95};
+
+      // fuzzy over all keys
+      const toks = tokenize(name);
+      let best=null;
+      for (const k of DATA.keys){
+        const score = jaccard(toks, tokenize(k)) + (k.startsWith(toks[0]||'')?0.15:0) + (k.includes((toks[0]||''))?0.05:0);
+        if (!best || score>best.score) best={key:k,score,rec:DATA.db[k]};
+      }
+      if (best && best.score>=0.35) return best; // threshold tuned for short lists
+      return null;
+    }
+
+    const pick = (row, names) => { for (const n of names){ if(n in row && row[n]!=='' && row[n]!=null) return row[n]; } };
     async function loadCSV(path){
       return new Promise((resolve)=> Papa.parse(path, {
         download:true, header:true, dynamicTyping:false, skipEmptyLines:'greedy',
@@ -336,14 +323,16 @@
     }
     async function ensureDataLoaded(){
       if (!CFG.enableNutrition || DATA.ready) return;
+      const merged = Object.create(null);
+
       for (const path of Object.values(CFG.datasets)){
         const rows = await loadCSV(path);
         for (const r0 of rows){
           const r={}; for (const k in r0) r[k.trim()] = r0[k];
           const name = pick(r, COLS.ingredient) || r[Object.keys(r)[0]];
           if (!name) continue;
-          const key = toKey(canonical(name));
-          const dst = (DATA.db[key] ||= { _name:name, _rows:[] }); dst._rows.push(r); DATA.rows++;
+          const k = toKey(canonical(name));
+          const dst = (merged[k] ||= { _name:name, _rows:[] }); dst._rows.push(r);
 
           const fields = [
             ['calories',COLS.calories],['protein_g',COLS.protein_g],['fiber_g',COLS.fiber_g],
@@ -352,15 +341,29 @@
             ['serving_size',COLS.serving_size],['mech_fn',COLS.mech_fn],['sources_details',COLS.sources_details],
             ['cog_benefits',COLS.cog_benefits],['other_benefits',COLS.other_benefits]
           ];
-          for (const [k,aliases] of fields){
-            if (dst[k]==null){
-              const v = pick(r, aliases);
-              if (v!=null && String(v).trim()!=='') dst[k]=v;
+          for (const [kk,aliases] of fields){
+            if (dst[kk]==null){
+              // try alias list → regex contains fallback (handles slightly different headings)
+              let v = pick(r, aliases);
+              if (v==null){
+                const keyList = Object.keys(r);
+                for (const col of keyList){
+                  const lc = col.toLowerCase();
+                  if (kk==='micro_type' && /microbiome.*(pre|pro|post)biotic/.test(lc)) v=r[col];
+                  else if (kk==='micro_score' && /microbiome.*score/.test(lc)) v=r[col];
+                  else if (kk==='dii' && /(dii|inflamm)/.test(lc)) v=r[col];
+                  else if (kk==='diets_list' && /(diet|compatible)/.test(lc)) v=r[col];
+                }
+              }
+              if (v!=null && String(v).trim()!=='') dst[kk]=v;
             }
           }
         }
       }
+      DATA.db = merged;
+      DATA.keys = Object.keys(merged);
       DATA.ready=true;
+      console.log('CSV loaded. Indexed ingredients:', DATA.keys.length);
     }
 
     // ---------- Parse GPT text for recipes ----------
@@ -407,17 +410,14 @@
     }
 
     // ---------- Build & inject the 5 tables ----------
-    function attachByName(recName){
-      const key = toKey(canonical(recName));
-      return DATA.db[key] || { _name: recName };
-    }
     function buildTablesForIngredients(list){
+      // normalize each ingredient and run robust match
       const rows = list.map(raw=>{
         const m = raw.match(/^([\d\/\.\,\s\-]+)?\s*([a-zA-Zµ]+)?\s*(.*)$/);
         const namePart = m ? (m[3]||raw) : raw;
-        const rec = attachByName(namePart);
-        const display = rec._name || namePart;
-        return { display, rec };
+        const bm = bestMatch(namePart) || {rec:{_name:namePart}, score:0};
+        const display = bm.rec._name || namePart;
+        return { display, rec:bm.rec };
       }).sort((a,b)=>a.display.localeCompare(b.display));
 
       const t1 = buildNutritionTable(rows);
@@ -427,6 +427,8 @@
       const t5 = buildMicronutrientBenefitsTable(rows);
       return `<div class="bp5stack">${t1}${t2}${t3}${t4}${t5}</div>`;
     }
+    const num = v => { if(v==null) return null; const x=parseFloat(String(v).replace(/[^\d\.\-]/g,'')); return Number.isFinite(x)?x:null; };
+    const fmt = (v,d=0) => (v==null || !Number.isFinite(v) ? 'N/A' : (d===0 ? String(Math.round(v)) : v.toFixed(d)));
     function buildNutritionTable(rows){
       let totCal=0, totProt=0, totFib=0, totGL=0;
       const body = rows.map(r=>{
@@ -509,7 +511,7 @@
       if(!rows.length) return null;
       const yes=new Set();
       for (const r of rows){
-        for (const d of POSSIBLE_DIETS){
+        for (const d of ['MIND','Mediterranean','DASH','LowGI','Pescetarian','Vegetarian','Vegan','Keto','Paleo','GlutenFree','DairyFree','AntiInflammatory','Modern']){
           if (d in r){
             const v = String(r[d]).toLowerCase();
             if (['1','y','yes','true','✓','x'].includes(v)) yes.add(d);
@@ -609,16 +611,26 @@
     }
 
     // =========================
-    // PUBLIC HANDLERS
+    // GENERATE HANDLERS
     // =========================
+    function buildRecipeSystemPrompt(count, explicitDish){
+      let base = `You are BrainPreserve’s recipe engine. Generate exactly ${count} brain-healthy recipe(s). For each recipe, include a clear title and a heading "Ingredients" followed by a bullet list with amounts. Respect user constraints strictly.`;
+      if (explicitDish){
+        base += ` If the request contains a specific dish (e.g., "${explicitDish}"), produce that dish only (or themed variants of that same dish) and do not add unrelated recipes.`;
+      }
+      return base;
+    }
+
     async function generateFromCustom(){
       setStatus('');
       const out = $('#custom-output');
       const custom = $('#custom-input').value.trim();
-      const numRaw = parseInt($('#num-recipes').value, 10);
-      const count = Number.isFinite(numRaw) && numRaw>0 ? Math.min(numRaw,10) : 5; // default 5
+      const numField = parseInt($('#num-recipes').value, 10);
+      const detected = detectDesiredCount(custom);
+      const count = Number.isFinite(numField) && numField>0 ? clamp(numField) : (detected || 5);
+      const dish = detectExplicitDish(custom);
 
-      const sys = `You are BrainPreserve’s recipe engine. Generate exactly ${count} brain-healthy recipes. For each recipe, include a heading and a heading "Ingredients" followed by a bullet list of ingredients with amounts (markdown bullets). Keep formatting simple.`;
+      const sys = buildRecipeSystemPrompt(count, dish);
       const user = `Request: ${custom || 'Chef’s choice within brain-healthy constraints.'}`;
 
       out.textContent = 'Generating...';
@@ -637,20 +649,76 @@
       if (pre.nextElementSibling && pre.nextElementSibling.classList?.contains('bp-after')) pre.nextElementSibling.remove();
     }
 
-    function clearFormSelections(){
-      document.querySelectorAll('.checks input[type=checkbox]').forEach(i => { i.checked = false; });
-      $('#num-recipes-form').value = '';
-      $('#form-preview').textContent = 'No selections yet.';
-      const out = $('#form-output'); if (out) out.remove();
-      // remove any injected stacks that might follow form-output
-      const pre = $('#form-output');
-      if (pre && pre.nextElementSibling && pre.nextElementSibling.classList?.contains('bp-after')) pre.nextElementSibling.remove();
-      setStatus('');
+    function renderIncludeAccordions(){
+      const root = $('#include-root'); root.innerHTML = '';
+      Object.entries(STARTER_INGREDIENTS).forEach(([cat, items])=>{
+        const catSlug = slugify(cat);
+        const acc = el('div', { class:'accordion' });
+        const header = el('div', { class:'acc-header', role:'button', tabindex:'0', 'aria-expanded':'false', onclick:'toggleAccordion(this)' },
+          el('h4', {}, cat),
+          el('span', { class:'muted' }, 'Click to expand')
+        );
+        const content = el('div', { class:'acc-content' });
+        const list = el('div', { class:'checks' });
+        items.forEach(val=>{
+          const id = `inc-${catSlug}-${slugify(val)}`;
+          const input = el('input', { type:'checkbox', id, value:val, 'data-cat':catSlug });
+          const label = el('label', { for:id }, input, val);
+          list.appendChild(label);
+        });
+        content.appendChild(list);
+        acc.appendChild(header); acc.appendChild(content);
+        root.appendChild(acc);
+      });
+    }
+    function renderChecks(containerId, items){
+      const root = document.getElementById(containerId); root.innerHTML = '';
+      items.forEach(v=>{
+        const id = `${containerId}-${slugify(v)}`;
+        const input = el('input', { type:'checkbox', id, value:v });
+        const label = el('label', { for:id }, input, v);
+        root.appendChild(label);
+      });
+    }
+    function getSelectedByCat(){
+      const inputs = document.querySelectorAll('input[type=checkbox][data-cat]');
+      const out = {};
+      inputs.forEach(i=>{
+        const cat = i.getAttribute('data-cat');
+        if (i.checked){ (out[cat] ||= []).push(i.value); }
+      });
+      return out;
+    }
+    function getSelected(containerId){
+      const root = document.getElementById(containerId);
+      const inputs = root ? root.querySelectorAll('input[type=checkbox]:checked') : [];
+      return Array.from(inputs).map(i=>i.value);
+    }
+    function collectForm(){
+      const selections = {};
+      Object.keys(STARTER_INGREDIENTS).forEach(cat=>{
+        const slug = slugify(cat);
+        selections[cat] = getSelectedByCat()[slug] || [];
+      });
+      const exclusions = getSelected('exc-categories');
+      const goals = getSelected('goals');
+      const numForm = parseInt($('#num-recipes-form')?.value, 10);
+      const count = Number.isFinite(numForm) && numForm > 0 ? clamp(numForm) : 5;
+      return { selections, exclusions, goals, count };
+    }
+    function buildPreviewText(data){
+      const parts = [];
+      for (const [cat, list] of Object.entries(data.selections)) {
+        if (list && list.length) parts.push(`${cat}: ${list.join(', ')}`);
+      }
+      if (data.exclusions?.length) parts.push(`Exclude categories: ${data.exclusions.join(', ')}`);
+      if (data.goals?.length) parts.push(`Goals: ${data.goals.join(', ')}`);
+      parts.push(`Number of recipes: ${data.count}`);
+      return parts.length ? parts.join('\n') : 'No selections yet.';
     }
 
     async function generateFromSelections(){
       setStatus('Working…');
-
       const form = collectForm();
       $('#form-preview').textContent = buildPreviewText(form);
 
@@ -666,7 +734,7 @@
         const exc = form.exclusions?.length ? `Exclude categories: ${form.exclusions.join(', ')}` : '';
         const goals = form.goals?.length ? `Goals: ${form.goals.join(', ')}` : '';
 
-        const sys = `You are BrainPreserve’s recipe engine. Use the provided selections, respect exclusions strictly, tailor to the listed goals, and return exactly ${form.count} recipes. For each recipe, include a heading and a heading "Ingredients" followed by a bullet list of ingredients with amounts (markdown bullets).`;
+        const sys = buildRecipeSystemPrompt(form.count, null);
         const user = `Selections:\n${selLines || '(none)'}\n${exc}\n${goals}`;
 
         const text = await callOpenAI([{ role:'system', content: sys }, { role:'user', content: user }]);
@@ -683,6 +751,15 @@
       }
     }
 
+    function clearFormSelections(){
+      document.querySelectorAll('.checks input[type=checkbox]').forEach(i => { i.checked = false; });
+      $('#num-recipes-form').value = '';
+      $('#form-preview').textContent = 'No selections yet.';
+      const out = $('#form-output'); if (out) out.remove();
+      if (out && out.nextElementSibling && out.nextElementSibling.classList?.contains('bp-after')) out.nextElementSibling.remove();
+      setStatus('');
+    }
+
     // =========================
     // INIT
     // =========================
@@ -696,7 +773,7 @@
           $('#form-preview').textContent = buildPreviewText(form);
         }
       });
-      await ensureDataLoaded();
+      await ensureDataLoaded(); // preload CSVs
     })();
 
     // Export handlers
