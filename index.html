@@ -3,45 +3,92 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Brain Healthy Meal Generator — Tables Enabled</title>
-
-  <!-- Your existing stylesheet (unchanged) -->
-  <link rel="stylesheet" href="style.css" />
-
+  <title>Brain Healthy Meal Generator — Standalone (CSV-only)</title>
   <style>
-    /* Markdown-like tables */
-    .bp-table{ border-collapse:collapse; width:100%; margin:12px 0 18px 0; font-size:14px; }
-    .bp-table th,.bp-table td{ border:1px solid #e5e7eb; padding:6px 8px; vertical-align:top; }
-    .bp-table th{ background:#f7f7fb; font-weight:600; }
-    .bp-total td{ font-weight:700; background:#f9fafb; }
-    .bp-footnote{ color:#667085; font-size:12px; margin:-6px 0 12px 0; }
-    .bp5stack h3{ margin:18px 0 8px 0; }
-    .bp-wrap { max-width: 980px; margin: 0 auto; padding: 0 16px; }
-    th { word-break: break-word; }
+    :root{ --bg:#f7f8fb; --fg:#111; --muted:#667085; --card:#fff; --line:#e5e7eb; --accent:#0a60ff; }
+    *{box-sizing:border-box}
+    body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:var(--bg);color:var(--fg)}
+    header{background:#fff;border-bottom:1px solid var(--line)}
+    .wrap{max-width:1000px;margin:0 auto;padding:20px 16px}
+    h1{margin:0 0 6px}
+    p.sub{margin:0;color:var(--muted)}
+    main{padding:24px 0}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:18px;box-shadow:0 1px 0 rgba(0,0,0,.02)}
+    .row{display:flex;gap:14px;flex-wrap:wrap}
+    .row>div{flex:1 1 320px}
+    label{display:block;font-weight:600;margin:6px 0 6px}
+    select, input[type="text"]{width:100%;border:1px solid var(--line);border-radius:10px;padding:8px;background:#fff}
+    .btn{appearance:none;border:0;border-radius:999px;background:var(--accent);color:#fff;padding:10px 16px;font-weight:600;cursor:pointer}
+    .btn:disabled{opacity:.5;cursor:not-allowed}
+    .btn.secondary{background:#111}
+    .hint{color:var(--muted);font-size:13px}
+    .status{font-size:13px;color:#0a7f2e}
+    .warn{color:#9a6700}
+    .err{color:#a62626}
 
-    /* Tiny diagnostics banner (appears only if needed) */
-    .bp-diag{position:fixed;left:12px;bottom:12px;background:#111;color:#fff;font:12px/1.2 system-ui,Segoe UI,Roboto,Arial,sans-serif;padding:8px 10px;border-radius:8px;box-shadow:0 6px 18px rgba(0,0,0,.25);opacity:.95;z-index:99999;max-width:320px}
-    .bp-diag.ok{background:#0a7f2e}
-    .bp-diag.warn{background:#9a6700}
-    .bp-diag.err{background:#a62626}
-    .bp-diag b{display:block;margin-bottom:4px}
+    /* Tables (markdown-like) */
+    .bp-table{border-collapse:collapse;width:100%;margin:12px 0 18px 0;font-size:14px}
+    .bp-table th,.bp-table td{border:1px solid #e5e7eb;padding:6px 8px;vertical-align:top}
+    .bp-table th{background:#f7f7fb;font-weight:600}
+    .bp-total td{font-weight:700;background:#f9fafb}
+    .bp-footnote{color:#667085;font-size:12px;margin:-6px 0 12px 0}
+    .bp5stack h3{margin:18px 0 8px 0}
+    th{word-break:break-word}
+    .recipe{border:1px solid var(--line);border-radius:12px;padding:14px;margin:18px 0;background:#fff}
+    .recipe h2{margin:0 0 6px}
+    .recipe .ingredients{margin:8px 0 0 18px}
+    .small{font-size:12px;color:var(--muted)}
   </style>
 
   <!-- PapaParse for robust CSV parsing -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-
-  <!-- Your existing app logic (unchanged) -->
-  <script defer src="app.js"></script>
 </head>
 <body>
-  <main class="bp-wrap" id="app-root">
-    <noscript>This app requires JavaScript.</noscript>
+  <header>
+    <div class="wrap">
+      <h1>Brain Healthy Meal Generator — Standalone</h1>
+      <p class="sub">Generates exactly 5 recipes and builds the 5 required tables from your 10 local CSV files. No GPT, no server.</p>
+    </div>
+  </header>
+
+  <main>
+    <div class="wrap">
+      <div class="card">
+        <div class="row">
+          <div>
+            <label for="mealType">Meal type</label>
+            <select id="mealType">
+              <option value="breakfast">Breakfast</option>
+              <option value="lunch" selected>Lunch</option>
+              <option value="dinner">Dinner</option>
+            </select>
+            <p class="hint">The generator uses deterministic, health-focused rules (no randomness) so output is stable.</p>
+          </div>
+          <div>
+            <label for="exclusions">Exclude ingredients (comma-separated)</label>
+            <input id="exclusions" type="text" placeholder="e.g., dairy, red meat">
+            <p class="hint">Optional. Exclusions are applied across all 5 recipes.</p>
+          </div>
+        </div>
+        <div class="row">
+          <div>
+            <button id="genBtn" class="btn">Generate 5 Recipes + Tables</button>
+          </div>
+          <div style="align-self:center">
+            <span id="status" class="status">Loading CSV data…</span>
+          </div>
+        </div>
+      </div>
+
+      <div id="output"></div>
+    </div>
   </main>
 
-  <!-- CSV-backed 5-table injector (robust detection + dual path CSV loading) -->
   <script>
   (function(){
-    // ---------- FILES you showed in /data/ ----------
+    "use strict";
+
+    // ---------------- CONFIG ----------------
     const CSV_BASENAMES = [
       'categories.csv',
       'diet_tool.csv',
@@ -55,10 +102,12 @@
       'protein.csv'
     ];
     const DATA_ROOTS = ['/data/', 'data/', './data/']; // try all
+    const POSSIBLE_DIETS = ['MIND','Mediterranean','DASH','LowGI','Pescetarian','Vegetarian','Vegan','Keto','Paleo','GlutenFree','DairyFree','AntiInflammatory','Modern'];
 
-    // ---------- COLUMN ALIASES ----------
+    // Column aliases across your files
     const COLS = {
       ingredient:     ['Ingredient','Ingredients','Food','Item','Name','Food Name','Ingredient Name'],
+      category:       ['Category','Group','Food Group','Class'],
       calories:       ['Calories','kcal','Calories_per_serving'],
       protein_g:      ['Protein (g)','Protein_g','Protein'],
       fiber_g:        ['Fiber (g)','Fiber_g','Fiber'],
@@ -75,19 +124,24 @@
       mech_fn:        ['Mechanism/Function','Mechanism','Function'],
       sources_details:['Notable Sources/Details','Notes','Details']
     };
-    const POSSIBLE_DIETS = ['MIND','Mediterranean','DASH','LowGI','Pescetarian','Vegetarian','Vegan','Keto','Paleo','GlutenFree','DairyFree','AntiInflammatory','Modern'];
 
-    const STATE = { db:{}, loaded:false, marked:new WeakSet(), csvRows:0, tablesMade:0, diagShown:false };
+    // Name normalization for better matching
+    const NAME_ALIAS = {
+      'extra virgin olive oil':'olive oil','ev olive oil':'olive oil',
+      'rolled oats':'oats','baby spinach':'spinach','greek yogurt':'yogurt',
+      'brown rice':'rice','wild salmon':'salmon','chickpeas':'garbanzo beans'
+    };
 
-    // ---------- Helpers ----------
-    const HEADING_REGEX = /^\s*ingredients\s*:?\s*$/i; // detects "Ingredients" or "Ingredients:"
-    const escapeHTML = s => String(s).replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
+    // ---------------- STATE ----------------
+    const DB = { data:{}, csvRows:0, ready:false, byCategory:{} };
+
+    // ---------------- HELPERS ----------------
+    const $ = sel => document.querySelector(sel);
+    const esc = s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
     const toKey = s => (s||'').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9\s\-]/g,'').replace(/\s+/g,' ').trim();
     const num = v => { if(v==null) return null; const x=parseFloat(String(v).replace(/[^\d\.\-]/g,'')); return Number.isFinite(x)?x:null; };
     const fmt = (v,d=0) => (v==null || !Number.isFinite(v) ? 'N/A' : (d===0 ? String(Math.round(v)) : v.toFixed(d)));
-    const pick = (row, names) => { for(const n of names){ if(n in row && row[n]!=='' && row[n]!=null) return row[n]; } };
-    const NAME_ALIAS = {'extra virgin olive oil':'olive oil','ev olive oil':'olive oil','rolled oats':'oats','baby spinach':'spinach','greek yogurt':'yogurt','brown rice':'rice','wild salmon':'salmon','chickpeas':'garbanzo beans'};
-
+    const pick = (row, names) => { for (const n of names){ if(n in row && row[n]!=='' && row[n]!=null) return row[n]; } };
     const canonical = raw => {
       let s = String(raw||'').toLowerCase();
       s = s.replace(/\(.*?\)/g,'').replace(/\b(fresh|chopped|diced|minced|cooked|raw|organic|extra|virgin|ground|dry|dried|toasted|unsalted|salted|low\-fat|nonfat|skinless|boneless)\b/g,'');
@@ -96,71 +150,73 @@
       if (s.endsWith('s') && !s.endsWith('ss')) s = s.slice(0,-1);
       return s;
     };
+    const includesWord = (s,word) => new RegExp(`\\b${word}\\b`,'i').test(s||'');
 
-    function showDiag(kind, title, msg){
-      if (STATE.diagShown) return; // at most one
-      const b = document.createElement('div');
-      b.className = 'bp-diag ' + (kind||'warn');
-      b.innerHTML = `<b>${escapeHTML(title||'Notice')}</b>${escapeHTML(msg||'')}`;
-      document.body.appendChild(b);
-      STATE.diagShown = true;
-      setTimeout(()=>{ b.remove(); }, 8000);
+    function setStatus(msg, cls){
+      const el = $('#status'); el.textContent = msg;
+      el.className = (cls ? cls : 'status');
     }
 
-    // ---------- CSV loading with multi-root retry ----------
+    // ---------------- CSV LOADING ----------------
     function loadAllCSVs(){
-      return new Promise(resolve=>{
-        let toLoad = CSV_BASENAMES.length;
+      return new Promise((resolve)=>{
+        let remaining = CSV_BASENAMES.length;
         CSV_BASENAMES.forEach(name => loadOneWithFallback(name, 0, ()=>{
-          if(--toLoad===0){ STATE.loaded=true; resolve(); }
+          if(--remaining===0){ DB.ready=true; resolve(); }
         }));
       });
     }
-
-    function loadOneWithFallback(name, idx, done){
-      if (idx >= DATA_ROOTS.length){ done(); return; }
-      const url = DATA_ROOTS[idx] + name;
+    function loadOneWithFallback(name, i, done){
+      if (i >= DATA_ROOTS.length){ done(); return; }
+      const url = DATA_ROOTS[i] + name;
       Papa.parse(url, {
         download:true, header:true, skipEmptyLines:'greedy',
         complete:(res)=>{
           if (Array.isArray(res.data) && res.data.length){
             mergeRows(res.data);
+            if (name === 'categories.csv') indexCategories(res.data);
             done();
           } else {
-            // try next root
-            loadOneWithFallback(name, idx+1, done);
+            loadOneWithFallback(name, i+1, done);
           }
         },
-        error:()=>{
-          loadOneWithFallback(name, idx+1, done);
-        }
+        error:()=>{ loadOneWithFallback(name, i+1, done); }
       });
     }
-
+    function indexCategories(rows){
+      for (const r0 of rows){
+        const r={}; for (const k in r0) r[k.trim()] = r0[k];
+        const name = pick(r, COLS.ingredient);
+        const cat  = pick(r, COLS.category);
+        if (!name || !cat) continue;
+        const key = toKey(canonical(name));
+        const ckey = String(cat).trim();
+        if (!DB.byCategory[ckey]) DB.byCategory[ckey] = new Set();
+        DB.byCategory[ckey].add(key);
+      }
+    }
     function mergeRows(rows){
       for (const r0 of rows){
         if(!r0) continue;
         const r={}; for (const k in r0) r[k.trim()] = r0[k];
         let name = pick(r, COLS.ingredient);
-        // Fallbacks: use the first column that *looks* like an ingredient, else first non-empty cell.
         if (!name){
           const keys = Object.keys(r);
-          const guess = keys.find(k => /ingredient|food|item|name/i.test(k));
-          if (guess) name = r[guess];
-          else name = r[keys[0]];
+          const guess = keys.find(k=>/ingredient|food|item|name/i.test(k)) || keys[0];
+          name = r[guess];
         }
         if (!name) continue;
-
         const key = toKey(canonical(name));
-        if (!STATE.db[key]) STATE.db[key] = { _name: name, _rows: [] };
-        const dst = STATE.db[key]; dst._rows.push(r); STATE.csvRows++;
+        if (!DB.data[key]) DB.data[key] = { _name:name, _rows:[] };
+        const dst = DB.data[key]; dst._rows.push(r); DB.csvRows++;
 
         const groups = [
           ['calories',COLS.calories],['protein_g',COLS.protein_g],['fiber_g',COLS.fiber_g],
           ['gi',COLS.gi],['gl',COLS.gl],['dii',COLS.dii],['key_micros',COLS.key_micros],
           ['micro_type',COLS.micro_type],['micro_score',COLS.micro_score],['cog_benefits',COLS.cog_benefits],
           ['other_benefits',COLS.other_benefits],['diets_list',COLS.diets_list],
-          ['serving_size',COLS.serving_size],['mech_fn',COLS.mech_fn],['sources_details',COLS.sources_details]
+          ['serving_size',COLS.serving_size],['mech_fn',COLS.mech_fn],['sources_details',COLS.sources_details],
+          ['category',COLS.category]
         ];
         for (const [k,aliases] of groups){
           if (dst[k]==null){
@@ -171,85 +227,132 @@
       }
     }
 
-    // ---------- Ingredient list detection (robust) ----------
-    function findIngredientBlocks(root){
-      const out = [];
-      // Strategy A: explicit heading near a UL/OL
-      const nodes = root.querySelectorAll('h1,h2,h3,h4,strong,b,div,span,p');
-      nodes.forEach(h=>{
-        const txt = (h.textContent||'').trim();
-        if (!HEADING_REGEX.test(txt)) return;
-        // search next few siblings for a list
-        let el = h.nextElementSibling, hops=0, found=null;
-        while (el && hops<8){
-          if (el.tagName==='UL' || el.tagName==='OL'){ found=el; break; }
-          // some GPT outputs wrap lists inside a div
-          const inner = el.querySelector && el.querySelector('ul,ol');
-          if (inner){ found = inner; break; }
-          if (/^H[1-6]$/.test(el.tagName)) break;
-          el = el.nextElementSibling; hops++;
+    // ---------------- RECIPE ENGINE (deterministic rules) ----------------
+    function listByCategory(nameLikeArray){
+      // returns array of DB keys whose category string contains any hint in nameLikeArray
+      const keys = new Set();
+      for (const k in DB.data){
+        const rec = DB.data[k];
+        const cat = (rec.category||'').toLowerCase();
+        for (const hint of nameLikeArray){
+          if (includesWord(cat, hint) || includesWord(rec._name.toLowerCase(), hint)){
+            keys.add(k); break;
+          }
         }
-        if (found && found.children.length>0) out.push({heading:h, list:found});
-      });
-
-      // Strategy B: any UL/OL that has a preceding sibling in the last few elements containing “Ingredients”
-      const lists = root.querySelectorAll('ul,ol');
-      lists.forEach(list=>{
-        if ([...out].some(o=>o.list===list)) return;
-        if (!list.children.length) return;
-        let prev=list.previousElementSibling, steps=0, ok=false;
-        while(prev && steps<5){
-          const t=(prev.textContent||'').trim();
-          if (/ingredients\s*:?/i.test(t)){ ok=true; break; }
-          if (/^H[1-6]$/.test(prev.tagName)) break;
-          prev=prev.previousElementSibling; steps++;
-        }
-        if (ok) out.push({heading:prev||list, list});
-      });
-
-      return out;
-    }
-
-    function parseIngredients(list){
-      const out=[];
-      list.querySelectorAll('li').forEach(li=>{
-        const raw=(li.textContent||'').trim();
-        if(!raw) return;
-        const m = raw.match(/^([\d\/\.\,\s\-]+)?\s*([a-zA-Zµ]+)?\s*(.*)$/);
-        let qty=null,unit=null,namePart=raw;
-        if(m){ qty = fracToFloat(m[1]); unit=m[2]?m[2].toLowerCase():null; namePart=m[3]||raw; }
-        const name = canonical(namePart);
-        if (name) out.push({ raw,name,qty,unit });
-      });
-      return out;
-    }
-
-    function fracToFloat(s){
-      if(!s) return null;
-      const parts = String(s).trim().split(/\s+/); let total=0;
-      for (const p of parts){
-        if (p.includes('/')){ const [a,b]=p.split('/').map(Number); if(Number.isFinite(a)&&Number.isFinite(b)&&b!==0) total+=a/b; }
-        else { const v=parseFloat(p); if(Number.isFinite(v)) total+=v; }
       }
-      return Number.isFinite(total)&&total>0 ? total : null;
+      return Array.from(keys);
+    }
+    function fromCatFile(categoryLabel){
+      // prefer explicit categories.csv if present
+      const s = DB.byCategory[categoryLabel];
+      return s ? Array.from(s).filter(k=>DB.data[k]) : [];
     }
 
-    function attachDB(it){
-      const key = toKey(it.name);
-      const rec = STATE.db[key] || null;
-      const display = rec? (rec._name || it.raw || it.name) : (it.raw || it.name);
-      return { ...it, rec, display };
+    // Supply pools
+    function poolVegetables(){ return uniq([...fromCatFile('Vegetables'), ...listByCategory(['vegetable','greens','broccoli','kale','spinach','lettuce','pepper','onion','tomato'])]); }
+    function poolWholeGrains(){ return uniq([...fromCatFile('Whole Grains'), ...listByCategory(['oat','oats','quinoa','brown','rice','barley','farro','buckwheat','whole','grain'])]); }
+    function poolLegumes(){ return uniq([...fromCatFile('Legumes'), ...listByCategory(['bean','lentil','chickpea','soy','edamame','legume'])]); }
+    function poolFish(){ return uniq([...fromCatFile('Fish'), ...listByCategory(['salmon','sardine','mackerel','trout','tuna','fish'])]); }
+    function poolMeat(){ return uniq([...fromCatFile('Meat'), ...listByCategory(['chicken','turkey','beef','pork','meat'])]); }
+    function poolNutsSeeds(){ return uniq([...fromCatFile('Nuts/Seeds'), ...listByCategory(['almond','walnut','pecan','seed','pumpkin','chia','flax','hemp','nut'])]); }
+    function poolOils(){ return uniq([...fromCatFile('Oils'), ...listByCategory(['oil','olive','avocado oil','extra virgin'])]); }
+    function poolDairy(){ return uniq([...fromCatFile('Dairy'), ...listByCategory(['yogurt','kefir','milk','cheese','dairy'])]); }
+    function poolFruit(){ return uniq([...fromCatFile('Fruit'), ...listByCategory(['berry','apple','banana','grape','orange','fruit'])]); }
+    function poolOther(){ return uniq([...fromCatFile('Other Ingredients'), ...listByCategory(['spice','herb','garlic','ginger','vinegar','lemon','coffee','tea','egg','honey'])]); }
+
+    function uniq(arr){ return Array.from(new Set(arr)); }
+    function without(keys, words){
+      if (!words || !words.length) return keys;
+      return keys.filter(k=>{
+        const nm = DB.data[k]? DB.data[k]._name.toLowerCase() : '';
+        return !words.some(w=>includesWord(nm, w));
+      });
     }
 
-    // ---------- Builders ----------
-    function buildAllTables(ingredients){
-      const rows = ingredients.map(attachDB).sort((a,b)=>a.display.localeCompare(b.display));
-      const t1 = buildNutritionTable(rows);
-      const t2 = buildCogTable(rows);
-      const t3 = buildDietTable(rows);
-      const t4 = buildMicrobiomeTable(rows);
-      const t5 = buildMicronutrientBenefitsTable(rows);
-      return `<div class="bp5stack">${t1}${t2}${t3}${t4}${t5}</div>`;
+    function choose(keys, n){
+      // deterministic pick: sort by name, take first n
+      const arr = keys.slice().sort((a,b)=>DB.data[a]._name.localeCompare(DB.data[b]._name));
+      return arr.slice(0, Math.max(0,n));
+    }
+
+    function buildOneRecipe(mealType, exclusionsWords, idx){
+      const veg = without(poolVegetables(), exclusionsWords);
+      const grains = without(poolWholeGrains(), exclusionsWords);
+      const legumes = without(poolLegumes(), exclusionsWords);
+      const fish = without(poolFish(), exclusionsWords);
+      const meat = without(poolMeat(), exclusionsWords);
+      const nuts = without(poolNutsSeeds(), exclusionsWords);
+      const oils = without(poolOils(), exclusionsWords);
+      const dairy = without(poolDairy(), exclusionsWords);
+      const fruit = without(poolFruit(), exclusionsWords);
+      const other = without(poolOther(), exclusionsWords);
+
+      let title = '';
+      let ingredients = [];
+
+      if (mealType==='breakfast'){
+        const base = grains.length? choose(grains,1) : choose(legumes,1);
+        const topFruit = choose(fruit,1);
+        const topNuts = choose(nuts,1);
+        const dairyOpt = choose(dairy,1);
+        ingredients = [...base, ...topFruit, ...topNuts, ...dairyOpt];
+        const protName = firstName(base[0]) || 'Oats';
+        title = `Brain-Healthy Breakfast Bowl with ${protName}`;
+      } else {
+        // lunch/dinner template: grain/legume base + protein + 2 veg + oil + nuts
+        const base = (grains.length? choose(grains,1) : choose(legumes,1));
+        const proteinPool = veg.length && legumes.length ? [...fish, ...legumes, ...meat] : [...fish, ...meat, ...legumes];
+        const protein = choose(proteinPool,1);
+        const vegs = choose(veg,2);
+        const oil = choose(oils,1);
+        const nut = choose(nuts,1);
+        ingredients = [...base, ...protein, ...vegs, ...oil, ...nut];
+        const pName = firstName(protein[0]) || 'Legumes';
+        const vName = firstName(vegs[0]) || 'Greens';
+        title = `Brain-Healthy ${capFirst(mealType)} Bowl with ${pName} & ${vName}`;
+      }
+
+      // De-duplicate
+      const seen = new Set(); ingredients = ingredients.filter(k=>k && !seen.has(k) && seen.add(k));
+
+      // Build printable ingredient lines (with estimated amounts for readability only)
+      const ingLines = ingredients.map(k => {
+        const nm = firstName(k);
+        // lightweight defaults
+        let amt = '1 serving';
+        const lower = (DB.data[k]? DB.data[k]._name.toLowerCase() : '');
+        if (includesWord(lower,'oil')) amt = '1 Tbsp';
+        else if (includesWord(lower,'nuts') || includesWord(lower,'seed') || includesWord(lower,'almond') || includesWord(lower,'walnut')) amt = '1 oz';
+        else if (includesWord(lower,'yogurt')) amt = '3/4 cup';
+        else if (includesWord(lower,'oat') || includesWord(lower,'quinoa') || includesWord(lower,'rice')) amt = '3/4 cup cooked';
+        else if (includesWord(lower,'salmon') || includesWord(lower,'chicken') || includesWord(lower,'turkey') || includesWord(lower,'tuna')) amt = '4 oz';
+        else if (includesWord(lower,'spinach') || includesWord(lower,'kale') || includesWord(lower,'broccoli')) amt = '1 cup';
+        else if (includesWord(lower,'berry') || includesWord(lower,'banana') || includesWord(lower,'apple')) amt = '1 cup';
+        return `${amt} ${nm}`;
+      });
+
+      return { title, ingredientsKeys: ingredients, ingredientLines: ingLines };
+    }
+
+    function firstName(key){
+      return key && DB.data[key] ? DB.data[key]._name : null;
+    }
+    function capFirst(s){ return s ? s.charAt(0).toUpperCase() + s.slice(1) : s; }
+
+    // ---------------- TABLE BUILDERS (exact order/headers) ----------------
+    function attachRec(key){ return DB.data[key] || null; }
+
+    function buildAllTables(keys){
+      // Sort alphabetically by display name
+      const rows = keys.map(k => ({ key:k, rec:attachRec(k), display:firstName(k)||k }))
+                       .sort((a,b)=>a.display.localeCompare(b.display));
+      return `
+        ${buildNutritionTable(rows)}
+        ${buildCogTable(rows)}
+        ${buildDietTable(rows)}
+        ${buildMicrobiomeTable(rows)}
+        ${buildMicronutrientBenefitsTable(rows)}
+      `;
     }
 
     function buildNutritionTable(rows){
@@ -266,21 +369,32 @@
         const mType = d.micro_type ?? 'N/A';
         const mScore = d.micro_score ?? 'N/A';
         return `<tr>
-          <td>${escapeHTML(r.display)}</td>
+          <td>${esc(r.display)}</td>
           <td>${fmt(cal)}</td>
           <td>${fmt(pr)}</td>
           <td>${fmt(fi)}</td>
           <td>${gi==null?'N/A':fmt(gi)}</td>
           <td>${gl==null?'N/A':fmt(gl)}</td>
-          <td>${escapeHTML(String(dii))}</td>
-          <td>${escapeHTML(String(keyMicros))}</td>
-          <td>${escapeHTML(String(mType))}</td>
-          <td>${escapeHTML(String(mScore))}</td>
+          <td>${esc(String(dii))}</td>
+          <td>${esc(String(keyMicros))}</td>
+          <td>${esc(String(mType))}</td>
+          <td>${esc(String(mScore))}</td>
         </tr>`;
       }).join('');
+
       const totals = `<tr class="bp-total">
-        <td>Totals</td><td>${fmt(totCal)}</td><td>${fmt(totProt)}</td><td>${fmt(totFib)}</td><td>—</td><td>${fmt(totGL)}</td><td>—</td><td>—</td><td>—</td><td>—</td>
+        <td>Totals</td>
+        <td>${fmt(totCal)}</td>
+        <td>${fmt(totProt)}</td>
+        <td>${fmt(totFib)}</td>
+        <td>—</td>
+        <td>${fmt(totGL)}</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
+        <td>—</td>
       </tr>`;
+
       return `
         <h3>1. Nutrition Table</h3>
         <table class="bp-table">
@@ -300,14 +414,18 @@
           </thead>
           <tbody>${body}${totals}</tbody>
         </table>
-        <div class="bp-footnote">Totals sum Calories, Protein, Fiber, and GL. GI and DII are not additive (shown as “—”). “N/A” appears when data are not available.</div>
+        <div class="bp-footnote">Totals sum Calories, Protein, Fiber, and GL. GI and DII are not additive (shown “—”). “N/A” appears when dataset fields are unavailable.</div>
       `;
     }
 
     function buildCogTable(rows){
       const body = rows.map(r=>{
         const d=r.rec||{};
-        return `<tr><td>${escapeHTML(r.display)}</td><td>${escapeHTML(d.cog_benefits ?? 'N/A')}</td><td>${escapeHTML(d.other_benefits ?? 'N/A')}</td></tr>`;
+        return `<tr>
+          <td>${esc(r.display)}</td>
+          <td>${esc(d.cog_benefits ?? 'N/A')}</td>
+          <td>${esc(d.other_benefits ?? 'N/A')}</td>
+        </tr>`;
       }).join('');
       return `
         <h3>2. Cognitive &amp; Other Health Benefits Table</h3>
@@ -323,7 +441,7 @@
         const d=r.rec||{};
         let diets = d.diets_list;
         if (!diets) diets = deriveDietList(d._rows || []);
-        return `<tr><td>${escapeHTML(r.display)}</td><td>${escapeHTML(diets ? String(diets) : 'N/A')}</td></tr>`;
+        return `<tr><td>${esc(r.display)}</td><td>${esc(diets ? String(diets) : 'N/A')}</td></tr>`;
       }).join('');
       return `
         <h3>3. Diet Compatibility Table</h3>
@@ -351,7 +469,11 @@
     function buildMicrobiomeTable(rows){
       const body = rows.map(r=>{
         const d=r.rec||{};
-        return `<tr><td>${escapeHTML(r.display)}</td><td>${escapeHTML(d.micro_type ?? 'N/A')}</td><td>${escapeHTML(d.micro_score ?? 'N/A')}</td></tr>`;
+        return `<tr>
+          <td>${esc(r.display)}</td>
+          <td>${esc(d.micro_type ?? 'N/A')}</td>
+          <td>${esc(d.micro_score ?? 'N/A')}</td>
+        </tr>`;
       }).join('');
       return `
         <h3>4. Microbiome Benefit Table</h3>
@@ -370,7 +492,14 @@
         const mech = d.mech_fn ?? 'N/A';
         const srcs = d.sources_details ?? 'N/A';
         const pct = estimatePercentRDA(d); // best-effort; “N/A” if not computable
-        return `<tr><td>${escapeHTML(r.display)}</td><td>${escapeHTML(serving)}</td><td>${escapeHTML(keyN)}</td><td>${escapeHTML(mech)}</td><td>${escapeHTML(srcs)}</td><td>${escapeHTML(pct ?? 'N/A')}</td></tr>`;
+        return `<tr>
+          <td>${esc(r.display)}</td>
+          <td>${esc(serving)}</td>
+          <td>${esc(keyN)}</td>
+          <td>${esc(mech)}</td>
+          <td>${esc(srcs)}</td>
+          <td>${esc(pct ?? 'N/A')}</td>
+        </tr>`;
       }).join('');
       return `
         <h3>5. Micronutrient Benefits Table</h3>
@@ -387,7 +516,7 @@
           </thead>
           <tbody>${body}</tbody>
         </table>
-        <div class="bp-footnote">%RDA appears only when present/derivable in your CSVs; otherwise “N/A”.</div>
+        <div class="bp-footnote">%RDA is shown only when a computable field is present across your CSVs; otherwise “N/A”.</div>
       `;
     }
 
@@ -406,57 +535,52 @@
       } catch { return null; }
     }
 
-    // ---------- Injection + observation ----------
-    function injectForRoot(root){
-      const blocks = findIngredientBlocks(root);
-      blocks.forEach(({heading,list})=>{
-        if (!list || !list.children || !list.children.length) return;
-        if (list.nextElementSibling && list.nextElementSibling.classList && list.nextElementSibling.classList.contains('bp5stack')) return;
+    // ---------------- RENDER PIPELINE ----------------
+    function renderRecipes(mealType, exclusionsCSV){
+      const out = $('#output'); out.innerHTML = '';
+      const excludeWords = (exclusionsCSV||'').split(',').map(s=>s.trim().toLowerCase()).filter(Boolean);
 
-        const items = parseIngredients(list);
-        if (!items.length) return;
-        const html = buildAllTables(items);
-        const wrap = document.createElement('div');
-        wrap.innerHTML = html;
-        list.insertAdjacentElement('afterend', wrap.firstElementChild);
-        STATE.tablesMade++;
+      // Build 5 recipes deterministically
+      const recipes = [];
+      for (let i=0;i<5;i++) recipes.push(buildOneRecipe(mealType, excludeWords, i));
+
+      recipes.forEach((R, idx)=>{
+        const el = document.createElement('section');
+        el.className = 'recipe';
+        el.innerHTML = `
+          <h2>${esc(R.title)}</h2>
+          <div class="small">Recipe ${idx+1} of 5</div>
+          <h3>Ingredients</h3>
+          <ul class="ingredients">
+            ${R.ingredientLines.map(li=>`<li>${esc(li)}</li>`).join('')}
+          </ul>
+          ${buildAllTables(R.ingredientsKeys)}
+        `;
+        out.appendChild(el);
       });
     }
 
-    function startObserver(){
-      const mo = new MutationObserver(muts=>{
-        muts.forEach(m=>{
-          (m.addedNodes||[]).forEach(n=>{
-            if (n.nodeType===1) injectForRoot(n);
-          });
-        });
-      });
-      mo.observe(document.body,{childList:true,subtree:true});
-
-      // initial scan + a few retries in case content streams in slowly
-      injectForRoot(document);
-      let tries=0;
-      const timer = setInterval(()=>{
-        injectForRoot(document);
-        if (++tries>5) clearInterval(timer);
-      }, 800);
-    }
-
-    // ---------- Boot ----------
+    // ---------------- INIT ----------------
     document.addEventListener('DOMContentLoaded', async ()=>{
+      setStatus('Loading CSV data…','status');
       await loadAllCSVs();
-      if (STATE.csvRows===0){
-        showDiag('err','CSV data not found','I looked for your 10 files in /data/ and data/. Ensure they’re uploaded to the deployed site in a “data” folder.');
+      if (DB.csvRows===0){
+        setStatus('No CSV data found. Ensure a folder named “data” sits next to index.html with 10 CSVs.','err');
+      } else {
+        setStatus('CSV data loaded. Ready.','status');
       }
-      startObserver();
 
-      // After a few seconds, if no tables were made, give a gentle hint.
-      setTimeout(()=>{
-        if (STATE.tablesMade===0){
-          showDiag('warn','No Ingredients detected','I didn’t find an “Ingredients” list. Make sure your recipe shows a heading “Ingredients” (with a list beneath).');
+      $('#genBtn').addEventListener('click', ()=>{
+        if (!DB.ready || DB.csvRows===0){
+          setStatus('CSV data missing — cannot generate.','err'); return;
         }
-      }, 5000);
+        const mealType = $('#mealType').value;
+        const excl = $('#exclusions').value;
+        renderRecipes(mealType, excl);
+        setStatus('Done.','status');
+      });
     });
+
   })();
   </script>
 </body>
