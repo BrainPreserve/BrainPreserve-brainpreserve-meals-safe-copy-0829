@@ -3,785 +3,454 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Brain Healthy Meal Generator — Standalone</title>
+  <title>Brain Healthy Nutrition Tables — Normalized CSV Loader</title>
   <style>
-    :root{ --bg:#f7f8fb; --fg:#111; --muted:#667085; --card:#fff; --line:#e5e7eb; --accent:#0a60ff; }
+    :root{ --bg:#f7f8fb; --fg:#111; --muted:#667085; --card:#fff; --line:#e5e7eb; --accent:#0a60ff; --good:#0b7; --warn:#b60; --bad:#c33 }
     *{box-sizing:border-box}
-    body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:#f7f8fb;color:#111}
-    main{max-width:980px;margin:28px auto;padding:0 16px}
-    h1{margin:0 0 8px}
-    h2{margin:0 0 8px}
-    .subtitle{color:#475467;margin:0 0 12px}
-    .card{background:#fff;border:1px solid #e5e7eb;border-radius:16px;padding:18px;box-shadow:0 4px 14px rgba(0,0,0,.04);margin:18px 0}
-    textarea{width:100%;padding:12px;border:1px solid #d0d5dd;border-radius:12px}
-    .row{display:flex;align-items:center;gap:10px;margin:10px 0;flex-wrap:wrap}
-    input[type="number"]{width:120px;padding:10px;border:1px solid #d0d5dd;border-radius:12px}
-    button{padding:10px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:12px;cursor:pointer}
-    button.ghost{border-color:#d0d5dd;background:#fff;color:#111}
-    button:disabled{opacity:.6;cursor:not-allowed}
-    .btn-row{display:flex;gap:10px;flex-wrap:wrap}
-    pre{white-space:pre-wrap;background:#ffffff;color:#111111;padding:14px;border-radius:12px;min-height:48px;margin-top:12px;border:1px solid #e5e7eb}
-    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    @media (max-width:860px){.grid{grid-template-columns:1fr}}
-    .accordion{border:1px dashed #d6d6d6;border-radius:12px;margin:10px 0;overflow:hidden;background:#fff}
-    .acc-header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#f9fafb;cursor:pointer}
-    .acc-header h4{margin:0;font-size:15px}
-    .acc-content{display:none;padding:12px 14px;background:#fff}
-    .acc-content.open{display:block}
-    .checks{display:flex;flex-wrap:wrap;gap:8px}
-    .checks label{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:10px}
-    .muted{color:#667085;font-size:13px;margin:0 0 6px}
-    table{width:100%; border-collapse:collapse; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden}
-    th, td{padding:10px; border-bottom:1px solid #f1f5f9}
-    thead tr{background:#f9f9fb}
-    th{ text-align:left; vertical-align:top; white-space:normal; word-wrap:break-word }
-    td.num{ text-align:right }
-    .status{font-size:12px;color:#475467;margin-top:8px}
-    .error{color:#b42318;background:#fef3f2;border:1px solid #fed7d7;padding:8px;border-radius:8px;margin-top:8px}
-
-    /* 5-table stack styles */
-    .bp-table{ border-collapse:collapse; width:100%; margin:12px 0 18px 0; font-size:14px; }
-    .bp-table th,.bp-table td{ border:1px solid #e5e7eb; padding:6px 8px; vertical-align:top; }
-    .bp-table th{ background:#f7f7fb; font-weight:600; }
-    .bp-total td{ font-weight:700; background:#f9fafb; }
-    .bp5stack h3{ margin:18px 0 8px 0; }
-    .bp-footnote{ color:#667085; font-size:12px; margin:-6px 0 12px 0; }
-    .bp-after{ margin-top:10px; }
+    body{font-family:System-ui,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:var(--bg);color:var(--fg)}
+    header{border-bottom:1px solid var(--line);background:var(--card)}
+    header .wrap{max-width:1000px;margin:0 auto;padding:14px 16px;display:flex;gap:12px;align-items:center;justify-content:space-between}
+    h1{font-size:18px;margin:0}
+    .muted{color:var(--muted)}
+    main{max-width:1000px;margin:20px auto;padding:0 16px 64px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;box-shadow:0 1px 2px rgba(0,0,0,.03)}
+    .row{display:flex;gap:12px;flex-wrap:wrap}
+    .grow{flex:1 1 280px}
+    input[type="text"], input[type="url"], select{width:100%;padding:10px 12px;border:1px solid var(--line);border-radius:10px}
+    button{border:0;background:var(--accent);color:#fff;padding:10px 14px;border-radius:12px;cursor:pointer}
+    button.secondary{background:#eef2ff;color:#1e40af}
+    table{width:100%;border-collapse:collapse}
+    th,td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+    th{text-align:left;background:#fafafa}
+    .pill{display:inline-block;padding:2px 8px;border-radius:999px;font-size:12px;border:1px solid var(--line)}
+    .ok{background:#ecfdf5;border-color:#d1fae5;color:#065f46}
+    .warn{background:#fff7ed;border-color:#ffedd5;color:#9a3412}
+    .bad{background:#fef2f2;border-color:#fee2e2;color:#991b1b}
+    details{border:1px dashed var(--line);border-radius:12px;padding:8px 10px;background:#fcfcff}
+    details[open]{background:#f8fbff}
+    summary{cursor:pointer;font-weight:600}
+    .kbd{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono","Courier New", monospace; font-size:12px; border:1px solid var(--line); padding:0 6px; border-radius:6px; background:#fafafa}
+    .small{font-size:12px}
+    .right{margin-left:auto}
+    .tag{display:inline-block;padding:2px 6px;border:1px solid var(--line);border-radius:8px;margin-right:4px;background:#fafafa}
+    .mono{font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace}
   </style>
 </head>
 <body>
+  <header>
+    <div class="wrap">
+      <h1>Brain Healthy Nutrition Tables <span class="muted">— CSV Normalizer</span></h1>
+      <div class="small muted">Open <span class="kbd">Ctrl</span>+<span class="kbd">Shift</span>+<span class="kbd">D</span> for Diagnostics</div>
+    </div>
+  </header>
+
   <main>
-    <h1>Brain Healthy Meal Generator</h1>
-    <p class="subtitle">Choose ingredients, set goals, or type a custom request. Recipes and coaching appear inline—no new tab.</p>
+    <!--
+      HOW TO USE (zero‑coding option for CSV locations)
+      1) If your CSVs are stored next to this file (e.g., /data/*.csv or same folder), try clicking "Reload Data" now.
+      2) If they are in WordPress Media Library (e.g., https://YOUR-SITE/wp-content/uploads/2025/08/),
+         paste that BASE URL below (keep the trailing /), then click Reload.
+      3) The file names we expect (you can change them in Settings):
+         categories.csv, diet_tool.csv, fiber.csv, gi_gl.csv, main.csv, microbiome.csv,
+         micronutients_list.csv, micronutrients_food.csv, moder.csv, protein.csv
+    -->
 
-    <!-- A) Custom Request -->
-    <section class="card">
-      <h2>Custom Request</h2>
-      <p>Example: “Make 3 dinners with salmon and legumes, dairy-free, low sodium.” Leave the number blank to default to 5 recipes.</p>
-      <textarea id="custom-input" rows="4" placeholder="Describe the meal(s) you want..."></textarea>
+    <section class="card" id="settings">
       <div class="row">
-        <label for="num-recipes">Number of recipes (optional):</label>
-        <input id="num-recipes" type="number" min="1" max="10" placeholder="5" />
+        <div class="grow">
+          <label class="small muted">CSV Base URL (leave empty to load from this same folder)</label>
+          <input type="url" id="baseUrl" placeholder="e.g., https://your-site.com/wp-content/uploads/2025/08/" />
+        </div>
+        <div>
+          <label class="small muted" style="visibility:hidden">_</label>
+          <button id="reloadBtn">Reload Data</button>
+        </div>
       </div>
-      <div class="btn-row">
-        <button onclick="generateFromCustom()">Generate Recipes</button>
-        <button class="ghost" type="button" onclick="clearCustomSection()">Clear Custom</button>
-      </div>
-      <pre id="custom-output"></pre>
+      <div class="small muted" style="margin-top:8px">You can move this whole file anywhere. Just keep your CSVs reachable (same folder or a public URL). No other changes needed.</div>
     </section>
 
-    <!-- B) Build From Ingredients -->
+    <div style="height:12px"></div>
+
     <section class="card">
-      <h2>Build From Ingredients</h2>
-      <p>Select ingredients to include and categories to exclude. Your selections preview below.</p>
-
-      <div class="grid">
-        <div>
-          <h3>Include Ingredients</h3>
-          <div id="include-root"></div>
+      <div class="row">
+        <div class="grow">
+          <label class="small muted">Find a food</label>
+          <input type="text" id="foodSearch" list="foodList" placeholder="Start typing (e.g., Arugula, Almond Milk, Eggs)" />
+          <datalist id="foodList"></datalist>
         </div>
-
         <div>
-          <div class="accordion" id="exclude-accordion">
-            <div class="acc-header" role="button" tabindex="0" aria-expanded="false" onclick="toggleAccordion(this)">
-              <h4>Exclude Categories</h4>
-              <span class="muted">Click to expand</span>
-            </div>
-            <div class="acc-content">
-              <p class="muted">Check entire categories to exclude them (e.g., “Dairy”).</p>
-              <div class="checks" id="exc-categories"></div>
-            </div>
-          </div>
-
-          <div class="accordion" id="goals-accordion">
-            <div class="acc-header" role="button" tabindex="0" aria-expanded="false" onclick="toggleAccordion(this)">
-              <h4>Nutrition Goals</h4>
-              <span class="muted">Click to expand</span>
-            </div>
-            <div class="acc-content">
-              <p class="muted">Select one or more goals to tailor coaching suggestions.</p>
-              <div class="checks" id="goals"></div>
-            </div>
-          </div>
-
-          <!-- Number of recipes for the selector -->
-          <div class="row">
-            <label for="num-recipes-form">Number of recipes (optional):</label>
-            <input id="num-recipes-form" type="number" min="1" max="10" placeholder="5" />
-          </div>
+          <label class="small muted" style="visibility:hidden">_</label>
+          <button id="showBtn" class="secondary">Show Nutrition</button>
         </div>
       </div>
-
-      <h3>Preview</h3>
-      <pre id="form-preview">No selections yet.</pre>
-
-      <div class="btn-row">
-        <button onclick="generateFromSelections()">Generate Recipes from Selections</button>
-        <button class="ghost" type="button" onclick="clearFormSelections()">Clear Form</button>
-      </div>
-
-      <div id="status" class="status"></div>
-      <div id="nutrition-root" class="card" style="display:none"></div>
+      <div id="status" class="small muted" style="margin-top:8px">Status: <span id="statusText">Waiting for data…</span></div>
     </section>
+
+    <div style="height:12px"></div>
+
+    <section class="card" id="results" style="display:none">
+      <h2 style="margin:0 0 8px">Nutrition Table</h2>
+      <div id="metaTags" style="margin-bottom:8px"></div>
+      <table id="nutritionTable"></table>
+    </section>
+
+    <div style="height:12px"></div>
+
+    <details id="diagnostics" style="display:none">
+      <summary>Diagnostics (Developer View)</summary>
+      <div class="small muted" style="margin:8px 0">Press <span class="kbd">Ctrl</span>+<span class="kbd">Shift</span>+<span class="kbd">D</span> to toggle this section.</div>
+      <div id="diagContent" class="mono" style="white-space:pre-wrap"></div>
+    </details>
   </main>
 
-  <!-- CSV parser -->
-  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+  <!-- d3-dsv (CSV parser) — embedded minified to keep this file standalone -->
+  <script>
+  // Minimal d3-dsv csvParse (MIT) — trimmed for csv only
+  // Source: https://github.com/d3/d3-dsv (inlined for one-file deploy)
+  (function(global){
+    function objectConverter(columns){ return new Function("d","return {" + columns.map(function(name,i){
+      return JSON.stringify(name) + ": d["+i+"]"; }).join(",") + "}" ); }
+    function inferColumns(rows){ var columnSet = Object.create(null), columns=[]; rows.forEach(function(row){
+      for (var i=0,n=row.length;i<n;++i){ var value=row[i], name=columns[i] || (columns[i] = i+""); if (value==null) continue; } });
+      return columns; }
+    function parseRows(text, f){ var EOL={}, EOF={}, N = text.length, I = 0, n = 0, t, eol;
+      function token(){ if (I >= N) return EOF; if (eol) return eol = false, EOL; var j = I; if (text.charCodeAt(j) === 34){ var i = j; while (i++ < N){ if (text.charCodeAt(i) === 34){ if (text.charCodeAt(i+1) !== 34) break; ++i; } } I = i + 2; var c = text.charCodeAt(i+1); if (c === 13){ eol = true; if (text.charCodeAt(i+2) === 10) ++I; } else if (c === 10){ eol = true; } return text.slice(j+1, i).replace(/""/g, '"'); }
+        while (I < N){ var c = text.charCodeAt(I++); if (c === 10) { eol = true; break; } if (c === 13){ eol = true; if (text.charCodeAt(I) === 10) ++I; break; } if (c === 44) break; } return text.slice(j, I - (eol || text.charCodeAt(I-1) === 44 ? 1 : 0)); }
+      var rows = []; var row = []; var r; while ((r = token()) !== EOF){ if (r === EOL){ if (f && (row = f(row, n++)) == null) row = []; else rows.push(row); row = []; } else row.push(r); } if (f && (row = f(row, n++)) == null) return rows; rows.push(row); return rows; }
+    function autoType(object){ for (var k in object){ var v = object[k]; if (v === "" || v == null) continue; var n = +v; if (!isNaN(n) && v.trim() !== "") object[k] = v.includes(".") ? n : n; } return object; }
+    function csvParse(text){ var header; return parseRows(text, function(row, i){ if (!i){ header = row; return; } var o = {}; for (var j=0; j<header.length; ++j){ o[header[j]] = row[j] === undefined ? "" : row[j]; } return o; }); }
+    global.csvParse = csvParse;
+  })(window);
+  </script>
 
   <script>
-    // =========================
-    // CONFIG
-    // =========================
-    const CFG = {
-      generateEndpoint: '/.netlify/functions/generate',
-      enableNutrition: true,
-      datasets: {
-        categories:          'data/categories.csv',
-        diet_tool:           'data/diet_tool.csv',
-        fiber:               'data/fiber.csv',
-        gi_gl:               'data/gi_gl.csv',
-        main:                'data/main.csv',
-        microbiome:          'data/microbiome.csv',
-        micronutrients_list: 'data/micronutrients_list.csv',
-        micronutrients_food: 'data/micronutrients_food.csv',
-        moder:               'data/moder.csv',
-        protein:             'data/protein.csv'
+  // ===== Utility: Canonicalization and Parsing =====
+  const U = {
+    canonHeader(h){ if(h==null) return null; return String(h)
+      .normalize("NFKD").replace(/[\u0300-\u036f]/g,"")
+      .toLowerCase().replace(/[\u00a0\u2007\u202f]/g," ")
+      .trim().replace(/[^\w]+/g,"_").replace(/_+/g,"_").replace(/^_|_$/g,""); },
+    canonFoodName(s){ if(!s) return null; return String(s)
+      .normalize("NFKD").replace(/[\u0300-\u036f]/g,"")
+      .toLowerCase().replace(/&/g,"and").replace(/[^a-z0-9]+/g," ")
+      .trim().replace(/\s+/g," "); },
+    parseNumber(v){ if(v==null) return null; let s = String(v).trim();
+      if(!s || s === '" "') return null; // handles odd '" "' placeholders
+      // remove unicode dashes, angle markers, approx
+      s = s.replace(/[—–−]/g,'-').replace(/[<>≈~]/g,'');
+      // remove units
+      s = s.replace(/\s?(kcal|cal|kj|g|mg|mcg|µg|ug|grams?|milligrams?|micrograms?)\b/gi,"");
+      // replace comma decimal and thousands
+      s = s.replace(/,(?=\d{3}\b)/g,'').replace(',', '.');
+      // map trace and similar
+      if(/^trace$/i.test(s)) return 0.05; // small but non-zero if you prefer 0, change here
+      if(/^na$/i.test(s)) return null;
+      s = s.replace(/[^0-9+\-.eE]/g,'');
+      if(!s) return null; const n = Number(s); return Number.isFinite(n) ? n : null; },
+    isTruthy(v){ if(v==null) return false; const s = String(v).trim(); if(!s) return false; if(s === '" "') return false; if(/^0$/.test(s)) return false; return true; },
+  };
+
+  // ===== Configurable file list (filenames only) =====
+  const FILES = [
+    'categories.csv',
+    'diet_tool.csv',
+    'fiber.csv',
+    'gi_gl.csv',
+    'main.csv',
+    'microbiome.csv',
+    'micronutients_list.csv', // note: spelling as provided
+    'micronutrients_food.csv',
+    'moder.csv',
+    'protein.csv'
+  ];
+
+  // ===== Header Synonyms (canonical_key -> list of acceptable header patterns) =====
+  const H = {
+    // identity keys
+    food_name: ['foods','food','ingredient','item','name','product'],
+
+    // core nutrition
+    energy_kcal: ['energy_kcal','calories','kcal','energy'],
+    protein_g: ['protein_g','protein_per_serving_g','protein_per_100g_g','protein'],
+    fiber_g: ['fiber_g','total_fiber_g','dietary_fiber_g','fibre_g','fiber'],
+    carbs_g: ['carbs_g','carbohydrate_g','carbohydrates_g','carb_g','carbohydrate'],
+    fat_g: ['fat_g','total_fat_g','fat'],
+    sugars_g: ['sugars_g','sugar_g','total_sugars_g'],
+    sodium_mg: ['sodium_mg','na_mg'],
+    gi: ['glycemic_index_gi','gi'],
+    gl: ['glycemic_load_per_serving','glycemic_load','gl'],
+    serving_size: ['serving_size','serving_size_estimation','serving_size_g'],
+
+    // scoring/tags
+    dii_score: ['dii_score','dii'],
+    microbiome_supporting: ['microbiome_supporting'],
+    mind: ['mind','✓mind'],
+    mediterranean: ['mediterranean','✓mediterranean'],
+    dash: ['dash','✓dash'],
+
+    // descriptive
+    key_micronutrients: ['key_micronutrients_bioactive_compounds','key_micronutrients_bioactive_compounds_'],
+    cognitive_benefits: ['direct_indirect_cognitive_benefits','direct_cognitive_benefits','inirect_cognitive_benefits','indirect_cognitive_benefits'],
+    mechanisms: ['supporting_mechanisms','mechanism_function'],
+    category: ['category'],
+  };
+
+  // Build quick reverse lookup from canonicalized header to canonical key
+  function buildHeaderMap(headers){
+    const map = {}; // canonHeader -> canonical_key
+    const canonHeaders = headers.map(U.canonHeader);
+    for(const [canonKey, list] of Object.entries(H)){
+      for(const candidate of list){
+        const idx = canonHeaders.indexOf(candidate);
+        if(idx !== -1){ map[candidate] = canonKey; }
       }
-    };
-
-    // =========================
-    // UI SOURCES
-    // =========================
-    const STARTER_INGREDIENTS = {
-      "Vegetables": ["GPT CHOOSES VEGETABLES","Arugula","Collard Greens","Kale","Mustard Greens","Romaine","Spinach","Swiss Chard","Broccoli","Brussel Sprouts","Cabbage","Cauliflower","Bell Peppers","Chili Peppers","Eggplant","Tomatoes","Beets","Carrots","Sweet Potatoes","Artichokes","Asparagus","Celery","Cucumber","Onions","Zucchini","Mushrooms","Cornmeal (whole grain)","Blue Corn","Sweet Corn","Grits (whole grain, cooked)","Heirloom Corn","Hominy Corn","Purple Corn","Polenta (cooked)"],
-      "Legumes": ["GPT CHOOSES LEGUMES","Chickpeas","Edamame","Green Peas","Lentils","Lupins","Miso","Natto","Peanuts","Soybeans","Split Peas","Tempeh","Tofu","Adzuki Beans","Black Beans","Kidney Beans","Mung Beans","Navy Beans","Pinto beans"],
-      "Fruit": ["GPT CHOOSES FRUIT","Apples","Avocados","Blackberries","Blueberries","Cranberries","Golgi Berries","Gooseberries","Grapes","Kiwis","Mulberries","Olives","Passion Fruit","Raspberries","Strawberries","Orange","Grapefruit","Lemon","Cherries","Watermelon","Black currants (Dried)","Bilberries (Dried)","Cranberries (Dried)","Prunes","Dates","Figs","Raisins","Gooseberries (Dried)","Mulberries (Dried)"],
-      "Fish": ["GPT CHOOSES FISH","Anchovies","Herring","Mackerel","Salmon","Sardines","Flounder","Sea Bass","Sturgeon","Trout","Yellow Catfish"],
-      "Whole Grains": ["GPT CHOOSES WHOLE GRAINS","Amaranth","Barley","Brown Rice","Farro","Millet","Oats/Oat Groats/Steel Cut/Rolled","Quinoa","Whole Grain (Bread)","Whole Wheat"],
-      "Nuts/Seeds": ["GPT CHOOSES NUTS OR SEEDS","Almonds","Almond Milk","Brazil Nuts","Cashews","Hazelnuts","Macadamia Nuts","Pecans","Pistachios","Walnuts","Chia Seeds","Flaxseeds","Pumpkin Seeds","Sesame Seeds","Sunflower Seeds"],
-      "Meat": ["GPT CHOOSES THE MEAT","Chicken Breast (skinless)","Turkey","Lamb","Pork Liver"],
-      "Pasta": ["GPT CHOOSES PASTA","Beet Pasta","Brown Rice Pasta","Buckwheat (Soba) Noodles","Chickpea Pasta","Lentil Pasta","Quinoa Pasta","Semolina Pasta","Sourdough Pasta","Spelt Pasta","Spinach Pasta","Whole Grain Pasta (non-wheat options)","Whole Wheat Pasta"],
-      "Dairy": ["GPT CHOOSES DAIRY","Asiago Cheese","Brie Cheese","Blue Cheese","Camembert Cheese","Cheddar Cheese","Edam Cheese","Gouda Cheese","Gruyère Cheese","Parmesan Cheese","Provolone Cheese","Romano Cheese","Swiss Cheese","Cottage Cheese","Feta Cheese","Limburger Cheese","Mozzarella Cheese (if fermented)","Tilsit Cheese","Yogurt (Fermented)","Low-fat Milk","Kefir"],
-      "Oils": ["GPT CHOOSES THE OIL","Avocado Oil (Cold-pressed, expeller-pressed)","Olive Oil (Extra Virgin -Cold-pressed)","Algae Oil","Cod Liver Oil","Krill Oil","Seaweed OIl","Chia Seed Oil","Flaxseed Oil","Hemp Seed Oil","Camellia Oil","Canola/Rapeseed Oil","Peony Oil","Pomegranate Seed Oiil","Safflower Oil","Sesame Oil","Soybean Oil","Sunflower Oil","Walnut Oil"],
-      "Fermented Foods": ["Apple Cider Vinegar","Balsamic Vinegar","Kefir","Kimchi","Kombucha (Unsweetened)","Sauerkraut","Yogurt (Fermented)"],
-      "Other Ingredients": ["GPT CHOOES OTHER (EGGS, COFFEE, TEA, HONEY, OTHERS)","Cacao","Capers","Coffee","Eggs","Green Tea","Honey","Kombucha (Unsweetened)","Seaweed","Soy Milk"]
-    };
-    const EXCLUDE_CATEGORIES = Object.keys(STARTER_INGREDIENTS);
-    const GOALS = [
-      "General Cognitive Health",
-      "Weight Loss / Metabolic Health",
-      "Blood Sugar Control (Low GI/GL)",
-      "Cardiovascular Support (Low Sodium / Healthy Fats)",
-      "Sleep Support",
-      "Anti-inflammatory Focus (Lower DII)",
-      "Microbiome Support (Pre/Pro/Post-biotic)"
-    ];
-
-    // =========================
-    // HELPERS
-    // =========================
-    const $ = sel => document.querySelector(sel);
-    function el(tag, attrs={}, ...children){
-      const node = document.createElement(tag);
-      Object.entries(attrs).forEach(([k,v])=>{
-        if(k==='class') node.className = v;
-        else if(k==='for') node.setAttribute('for', v);
-        else if(k==='html') node.innerHTML = v;
-        else node.setAttribute(k,v);
-      });
-      children.forEach(c => node.append(c));
-      return node;
     }
-    function slugify(s){ return String(s||'').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,''); }
-    function toggleAccordion(header){
-      const acc = header.parentElement;
-      const content = acc.querySelector('.acc-content');
-      const open = content.classList.toggle('open');
-      header.setAttribute('aria-expanded', open ? 'true' : 'false');
-    }
-    function setStatus(msg){ const s=$('#status'); if(s) s.textContent = msg; }
+    return map; // not all headers will be mapped; we only use known ones
+  }
 
-    // =========================
-    // NUMBER & DISH DETECTION (custom text)
-    // =========================
-    const NUMBER_WORDS = {one:1,two:2,three:3,four:4,five:5,six:6,seven:7,eight:8,nine:9,ten:10};
-    function detectDesiredCount(text){
-      const t = (text||'').toLowerCase();
-      const m1 = t.match(/\b(?:make|generate|create|give|show)\s+(\d{1,2})\b/);
-      if (m1) return clamp(parseInt(m1[1],10));
-      const m2 = t.match(/\b(\d{1,2})\s+(?:recipes?|dishes?|meals?|ideas?|omelettes?|salads?|soups?)\b/);
-      if (m2) return clamp(parseInt(m2[1],10));
-      const m3 = t.match(/\b(?:make|generate|create)\s+(one|two|three|four|five|six|seven|eight|nine|ten)\b/);
-      if (m3) return clamp(NUMBER_WORDS[m3[1]]);
-      // pattern like "1 omelette"
-      const m4 = t.match(/\b(\d{1,2})\s+[a-z]/);
-      if (m4) return clamp(parseInt(m4[1],10));
-      return null;
-    }
-    function clamp(n){ return Math.max(1, Math.min(10, n)); }
-    function detectExplicitDish(text){
-      // common dish keyword extraction (first noun-like term after number or verbs)
-      const m = (text||'').toLowerCase().match(/\b(?:make|generate|create|cook|prepare)?\s*(?:\d+\s+)?([a-z][a-z\s\-]{2,})/);
-      if (!m) return null;
-      // take first 3 words, stop at punctuation
-      return m[1].split(/[.,;:]/)[0].trim();
-    }
+  // ===== Data store =====
+  const Store = {
+    baseUrl: '',
+    rawByFile: {},
+    mergedByFood: new Map(), // key: canonFoodName -> record object
+    foodsList: [],
+    headerAudit: {},
+  };
 
-    // =========================
-    // OPENAI VIA NETLIFY FUNCTION
-    // =========================
-    async function callOpenAI(messages){
-      const resp = await fetch(CFG.generateEndpoint, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ messages, temperature: 0.2, max_tokens: 1400, model: 'gpt-4o-mini' })
-      });
-      const data = await resp.json();
-      if (!resp.ok) throw new Error(data?.error || ('HTTP '+resp.status));
-      return data?.content || '';
-    }
+  // ===== Fetch & Parse =====
+  async function fetchText(url){
+    const res = await fetch(url, { cache: 'no-store' });
+    if(!res.ok) throw new Error('HTTP '+res.status+' for '+url);
+    return await res.text();
+  }
 
-    // =========================
-    // CSV LOADING + ROBUST MATCHER
-    // =========================
-    const DATA = { ready:false, db:Object.create(null), keys:[] };
-
-    const COLS = {
-      ingredient:     ['Ingredient','Ingredients','Food','Item','Name','Food Name','Ingredient Name'],
-      calories:       ['Calories','kcal','Calories_per_serving'],
-      protein_g:      ['Protein (g)','Protein_g','Protein'],
-      fiber_g:        ['Fiber (g)','Fiber_g','Fiber'],
-      gi:             ['GI','Glycemic Index'],
-      gl:             ['GL','Glycemic Load'],
-      dii:            ['DII Score','DII','AntiInflammatoryScore','Anti-Inflammatory/DII','Anti-Inflammatory/DII Score (lower is better)'],
-      key_micros:     ['Key Micronutrients','Key Nutrients/Bioactives','Key_Nutrients'],
-      micro_type:     ['Microbiome Prebiotic or Probiotic or Postbiotic','Microbiome_Type','Pre/Pro/Postbiotic','Microbiome Type'],
-      micro_score:    ['Microbiome Benefit Score','Microbiome_Score','Benefit Score'],
-      diets_list:     ['Compatible Diets','Diets','Diet_Compat','Diet Tags'],
-      serving_size:   ['Serving Size','Serving','Common Serving'],
-      mech_fn:        ['Mechanism/Function','Mechanism','Function'],
-      sources_details:['Notable Sources/Details','Notes','Details'],
-      cog_benefits:   ['Cognitive Benefits & Mechanisms','Cognitive_Benefits','Cognition_Mechanisms'],
-      other_benefits: ['Other Health Benefits','Other_Benefits']
-    };
-
-    const ALIAS = {
-      'extra virgin olive oil':'olive oil', 'ev olive oil':'olive oil', 'olive oil (extra virgin)':'olive oil',
-      'rolled oats':'oats', 'steel-cut oats':'oats', 'oat groats':'oats',
-      'baby spinach':'spinach', 'kale leaves':'kale',
-      'greek yogurt':'yogurt', 'plain yogurt':'yogurt',
-      'brown rice':'rice (brown)', 'wild salmon':'salmon',
-      'garbanzo beans':'chickpeas', 'chickpea':'chickpeas',
-      'egg':'eggs', 'large eggs':'eggs', 'pasture-raised eggs':'eggs'
-    };
-
-    const esc = s=>String(s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
-    const toKey = s => (s||'').toLowerCase().normalize('NFKD').replace(/[\u0300-\u036f]/g,'').replace(/[^a-z0-9\s\-]/g,'').replace(/\s+/g,' ').trim();
-    function canonical(raw){
-      let s = String(raw||'').toLowerCase();
-      s = s.replace(/\(.*?\)/g,'');
-      s = s.replace(/\b(free\-range|pasture\-raised|organic|fresh|large|small|medium|chopped|diced|minced|cooked|raw|extra|virgin|ground|dry|dried|toasted|unsalted|salted|skinless|boneless|low\-fat|nonfat)\b/g,'');
-      s = s.replace(/\s+/g,' ').trim();
-      if (ALIAS[s]) s = ALIAS[s];
-      if (s.endsWith('s') && !s.endsWith('ss')) s = s.slice(0,-1); // singularize
-      return s;
-    }
-    function tokenize(s){
-      return toKey(s).split(' ').filter(w=>w.length>2);
-    }
-    function jaccard(a,b){
-      const A=new Set(a), B=new Set(b);
-      const inter=[...A].filter(x=>B.has(x)).length;
-      const uni=new Set([...A,...B]).size;
-      return uni? inter/uni : 0;
-    }
-    function bestMatch(name){
-      // exact
-      const key = toKey(canonical(name));
-      if (DATA.db[key]) return {rec:DATA.db[key], score:1};
-
-      // alias direct
-      if (ALIAS[key] && DATA.db[toKey(ALIAS[key])]) return {rec:DATA.db[toKey(ALIAS[key])], score:0.95};
-
-      // fuzzy over all keys
-      const toks = tokenize(name);
-      let best=null;
-      for (const k of DATA.keys){
-        const score = jaccard(toks, tokenize(k)) + (k.startsWith(toks[0]||'')?0.15:0) + (k.includes((toks[0]||''))?0.05:0);
-        if (!best || score>best.score) best={key:k,score,rec:DATA.db[k]};
+  async function loadAll(){
+    const base = Store.baseUrl.trim();
+    const urls = FILES.map(f => base ? base + f : f);
+    const results = await Promise.allSettled(urls.map(u => fetchText(u)));
+    Store.rawByFile = {};
+    const diag = [];
+    for(let i=0;i<urls.length;i++){
+      const fname = FILES[i];
+      const r = results[i];
+      if(r.status === 'fulfilled'){
+        const text = r.value; const rows = window.csvParse(text);
+        Store.rawByFile[fname] = rows;
+        diag.push(`✔ Loaded ${fname} (${rows.length} rows)`);
+      } else {
+        diag.push(`✖ Failed ${fname}: ${r.reason}`);
       }
-      if (best && best.score>=0.35) return best; // threshold tuned for short lists
-      return null;
     }
+    document.getElementById('diagContent').textContent = diag.join('\n');
+  }
 
-    const pick = (row, names) => { for (const n of names){ if(n in row && row[n]!=='' && row[n]!=null) return row[n]; } };
-    async function loadCSV(path){
-      return new Promise((resolve)=> Papa.parse(path, {
-        download:true, header:true, dynamicTyping:false, skipEmptyLines:'greedy',
-        complete:(res)=>resolve(res.data || []), error:()=>resolve([])
-      }));
-    }
-    async function ensureDataLoaded(){
-      if (!CFG.enableNutrition || DATA.ready) return;
-      const merged = Object.create(null);
+  // ===== Merge logic =====
+  function mergeAll(){
+    Store.mergedByFood = new Map();
+    Store.headerAudit = {};
 
-      for (const path of Object.values(CFG.datasets)){
-        const rows = await loadCSV(path);
-        for (const r0 of rows){
-          const r={}; for (const k in r0) r[k.trim()] = r0[k];
-          const name = pick(r, COLS.ingredient) || r[Object.keys(r)[0]];
-          if (!name) continue;
-          const k = toKey(canonical(name));
-          const dst = (merged[k] ||= { _name:name, _rows:[] }); dst._rows.push(r);
+    for(const [fname, rows] of Object.entries(Store.rawByFile)){
+      if(!rows || !rows.length) continue;
+      const headers = Object.keys(rows[0] || {});
+      const canonHeaders = headers.map(U.canonHeader);
+      const headerMap = buildHeaderMap(headers);
+      Store.headerAudit[fname] = { headers, canonHeaders, headerMap };
 
-          const fields = [
-            ['calories',COLS.calories],['protein_g',COLS.protein_g],['fiber_g',COLS.fiber_g],
-            ['gi',COLS.gi],['gl',COLS.gl],['dii',COLS.dii],['key_micros',COLS.key_micros],
-            ['micro_type',COLS.micro_type],['micro_score',COLS.micro_score],['diets_list',COLS.diets_list],
-            ['serving_size',COLS.serving_size],['mech_fn',COLS.mech_fn],['sources_details',COLS.sources_details],
-            ['cog_benefits',COLS.cog_benefits],['other_benefits',COLS.other_benefits]
-          ];
-          for (const [kk,aliases] of fields){
-            if (dst[kk]==null){
-              // try alias list → regex contains fallback (handles slightly different headings)
-              let v = pick(r, aliases);
-              if (v==null){
-                const keyList = Object.keys(r);
-                for (const col of keyList){
-                  const lc = col.toLowerCase();
-                  if (kk==='micro_type' && /microbiome.*(pre|pro|post)biotic/.test(lc)) v=r[col];
-                  else if (kk==='micro_score' && /microbiome.*score/.test(lc)) v=r[col];
-                  else if (kk==='dii' && /(dii|inflamm)/.test(lc)) v=r[col];
-                  else if (kk==='diets_list' && /(diet|compatible)/.test(lc)) v=r[col];
+      for(const row of rows){
+        // find the best name column
+        let rawName = null; let rawKeyCol = null;
+        for(const nameCol of (H.food_name||[])){
+          const idx = canonHeaders.indexOf(nameCol);
+          if(idx !== -1){ const colName = headers[idx]; rawName = row[colName]; rawKeyCol = colName; break; }
+        }
+        if(!rawName){ continue; }
+        const key = U.canonFoodName(rawName);
+        if(!key) continue;
+
+        // init record
+        const rec = Store.mergedByFood.get(key) || { __names:new Set(), __sources:new Set() };
+        rec.__names.add(String(rawName).trim());
+        rec.__sources.add(fname);
+
+        // transfer known columns
+        for(let j=0;j<headers.length;j++){
+          const orig = headers[j]; const canon = U.canonHeader(orig);
+          const canonKey = headerMap[canon]; if(!canonKey) continue;
+          const val = row[orig];
+          switch(canonKey){
+            case 'protein_g':
+            case 'fiber_g':
+            case 'carbs_g':
+            case 'fat_g':
+            case 'sugars_g':
+            case 'sodium_mg':
+            case 'energy_kcal':
+            case 'gi':
+            case 'gl':
+              {
+                const n = U.parseNumber(val);
+                if(n===0 || Number.isFinite(n)){
+                  // prefer keeping an existing finite value; override only if undefined
+                  if(!(canonKey in rec) || rec[canonKey]==null){ rec[canonKey] = n; }
                 }
               }
-              if (v!=null && String(v).trim()!=='') dst[kk]=v;
-            }
+              break;
+            case 'serving_size':
+              {
+                const s = String(val||'').trim(); if(s){ rec.serving_size = s; }
+              }
+              break;
+            case 'dii_score':
+              {
+                const n = U.parseNumber(val);
+                if(n===0 || Number.isFinite(n)){
+                  if(!(canonKey in rec) || rec[canonKey]==null){ rec[canonKey] = n; }
+                }
+              }
+              break;
+            case 'microbiome_supporting':
+            case 'mind':
+            case 'mediterranean':
+            case 'dash':
+              if(U.isTruthy(val)) rec[canonKey] = true;
+              break;
+            case 'key_micronutrients':
+            case 'cognitive_benefits':
+            case 'mechanisms':
+            case 'category':
+              {
+                const s = String(val||'').trim(); if(s){ rec[canonKey] = s; }
+              }
+              break;
           }
         }
-      }
-      DATA.db = merged;
-      DATA.keys = Object.keys(merged);
-      DATA.ready=true;
-      console.log('CSV loaded. Indexed ingredients:', DATA.keys.length);
-    }
-
-    // ---------- Parse GPT text for recipes ----------
-    function normLine(s){
-      return String(s||'')
-        .replace(/[*_`~>#]/g,'')
-        .replace(/\u2022/g,'-')
-        .replace(/\r/g,'')
-        .trim();
-    }
-    function isIngredientsLine(s){ return /^ingredients?\b/.test(normLine(s).toLowerCase()); }
-    function isStopLine(s){
-      const t = normLine(s).toLowerCase();
-      return !t || /^instructions?\b/.test(t) || /^method\b/.test(t) || /^directions?\b/.test(t) || /^notes?\b/.test(t);
-    }
-    function likelyTitle(s){
-      const t = normLine(s);
-      return t && !/^\-|\*|\d+\./.test(t) && !/^ingredients?/i.test(t) && t.length <= 120;
-    }
-    function parseRecipesFromText(txt){
-      const rawLines = String(txt||'').split('\n');
-      const lines = rawLines.map(normLine);
-      const recipes=[];
-      for (let i=0;i<lines.length;i++){
-        if (!isIngredientsLine(lines[i])) continue;
-        let title = null;
-        for (let k=i-1, seen=0; k>=0 && seen<3; k--){
-          if (!lines[k]) continue;
-          if (likelyTitle(lines[k])){ title = lines[k].replace(/^\d+\.\s*/,'').trim(); break; }
-          seen++;
-        }
-        if (!title) title = `Recipe ${recipes.length+1}`;
-        const items=[];
-        for (let j=i+1; j<lines.length; j++){
-          const L = lines[j];
-          if (isStopLine(L)) break;
-          if (/^\s*(-|\*|\d+\.)\s*/.test(rawLines[j]) || /^[\d\/\.\,]+\s*[a-zA-Zµ]*\s+/.test(L) || /^[A-Za-z]/.test(L)){
-            if (L.length>0) items.push(L);
-          } else if (!L) break; else if (/^[A-Z]/.test(L)) break;
-        }
-        if (items.length) recipes.push({ title, ingredients: items });
-      }
-      return recipes;
-    }
-
-    // ---------- Build & inject the 5 tables ----------
-    function buildTablesForIngredients(list){
-      // normalize each ingredient and run robust match
-      const rows = list.map(raw=>{
-        const m = raw.match(/^([\d\/\.\,\s\-]+)?\s*([a-zA-Zµ]+)?\s*(.*)$/);
-        const namePart = m ? (m[3]||raw) : raw;
-        const bm = bestMatch(namePart) || {rec:{_name:namePart}, score:0};
-        const display = bm.rec._name || namePart;
-        return { display, rec:bm.rec };
-      }).sort((a,b)=>a.display.localeCompare(b.display));
-
-      const t1 = buildNutritionTable(rows);
-      const t2 = buildCogTable(rows);
-      const t3 = buildDietTable(rows);
-      const t4 = buildMicrobiomeTable(rows);
-      const t5 = buildMicronutrientBenefitsTable(rows);
-      return `<div class="bp5stack">${t1}${t2}${t3}${t4}${t5}</div>`;
-    }
-    const num = v => { if(v==null) return null; const x=parseFloat(String(v).replace(/[^\d\.\-]/g,'')); return Number.isFinite(x)?x:null; };
-    const fmt = (v,d=0) => (v==null || !Number.isFinite(v) ? 'N/A' : (d===0 ? String(Math.round(v)) : v.toFixed(d)));
-    function buildNutritionTable(rows){
-      let totCal=0, totProt=0, totFib=0, totGL=0;
-      const body = rows.map(r=>{
-        const d=r.rec||{};
-        const cal=num(d.calories); if(cal!=null) totCal+=cal;
-        const pr=num(d.protein_g); if(pr!=null) totProt+=pr;
-        const fi=num(d.fiber_g);   if(fi!=null) totFib+=fi;
-        const gi=num(d.gi);
-        const gl=num(d.gl);        if(gl!=null) totGL+=gl;
-        const dii = (d.dii!=null && String(d.dii).trim()!=='') ? d.dii : 'N/A';
-        const keyMicros = d.key_micros ?? 'N/A';
-        const mType = d.micro_type ?? 'N/A';
-        const mScore = d.micro_score ?? 'N/A';
-        return `<tr>
-          <td>${esc(r.display)}</td>
-          <td>${fmt(cal)}</td>
-          <td>${fmt(pr)}</td>
-          <td>${fmt(fi)}</td>
-          <td>${gi==null?'N/A':fmt(gi)}</td>
-          <td>${gl==null?'N/A':fmt(gl)}</td>
-          <td>${esc(String(dii))}</td>
-          <td>${esc(String(keyMicros))}</td>
-          <td>${esc(String(mType))}</td>
-          <td>${esc(String(mScore))}</td>
-        </tr>`;
-      }).join('');
-      const totals = `<tr class="bp-total">
-        <td>Totals</td><td>${fmt(totCal)}</td><td>${fmt(totProt)}</td><td>${fmt(totFib)}</td><td>—</td><td>${fmt(totGL)}</td><td>—</td><td>—</td><td>—</td><td>—</td>
-      </tr>`;
-      return `
-        <h3>1. Nutrition Table</h3>
-        <table class="bp-table">
-          <thead>
-            <tr>
-              <th>Ingredient</th>
-              <th>Calories</th>
-              <th>Protein (g)</th>
-              <th>Fiber (g)</th>
-              <th>GI</th>
-              <th>GL</th>
-              <th>Anti-Inflammatory/<wbr>DII Score<br>(lower is better)</th>
-              <th>Key Micronutrients</th>
-              <th>Microbiome Prebiotic or Probiotic or Postbiotic</th>
-              <th>Microbiome Benefit Score</th>
-            </tr>
-          </thead>
-          <tbody>${body}${totals}</tbody>
-        </table>
-      `;
-    }
-    function buildCogTable(rows){
-      const body = rows.map(r=>{
-        const d=r.rec||{};
-        return `<tr><td>${esc(r.display)}</td><td>${esc(d.cog_benefits ?? 'N/A')}</td><td>${esc(d.other_benefits ?? 'N/A')}</td></tr>`;
-      }).join('');
-      return `
-        <h3>2. Cognitive &amp; Other Health Benefits Table</h3>
-        <table class="bp-table">
-          <thead><tr><th>Ingredient</th><th>Cognitive Benefits &amp; Mechanisms</th><th>Other Health Benefits</th></tr></thead>
-          <tbody>${body}</tbody>
-        </table>
-      `;
-    }
-    function buildDietTable(rows){
-      const body = rows.map(r=>{
-        const d=r.rec||{};
-        let diets = d.diets_list;
-        if (!diets) diets = deriveDietList(d._rows || []);
-        return `<tr><td>${esc(r.display)}</td><td>${esc(diets ? String(diets) : 'N/A')}</td></tr>`;
-      }).join('');
-      return `
-        <h3>3. Diet Compatibility Table</h3>
-        <table class="bp-table">
-          <thead><tr><th>Ingredient</th><th>Compatible Diets</th></tr></thead>
-          <tbody>${body}</tbody>
-        </table>
-      `;
-    }
-    function deriveDietList(rows){
-      if(!rows.length) return null;
-      const yes=new Set();
-      for (const r of rows){
-        for (const d of ['MIND','Mediterranean','DASH','LowGI','Pescetarian','Vegetarian','Vegan','Keto','Paleo','GlutenFree','DairyFree','AntiInflammatory','Modern']){
-          if (d in r){
-            const v = String(r[d]).toLowerCase();
-            if (['1','y','yes','true','✓','x'].includes(v)) yes.add(d);
-          }
-        }
-      }
-      return yes.size ? Array.from(yes).sort().join(', ') : null;
-    }
-    function buildMicrobiomeTable(rows){
-      const body = rows.map(r=>{
-        const d=r.rec||{};
-        return `<tr><td>${esc(r.display)}</td><td>${esc(d.micro_type ?? 'N/A')}</td><td>${esc(d.micro_score ?? 'N/A')}</td></tr>`;
-      }).join('');
-      return `
-        <h3>4. Microbiome Benefit Table</h3>
-        <table class="bp-table">
-          <thead><tr><th>Ingredient</th><th>Microbiome Prebiotic or Probiotic or Postbiotic</th><th>Microbiome Benefit Score</th></tr></thead>
-          <tbody>${body}</tbody>
-        </table>
-      `;
-    }
-    function buildMicronutrientBenefitsTable(rows){
-      const body = rows.map(r=>{
-        const d=r.rec||{};
-        const serving = d.serving_size ?? 'N/A';
-        const keyN = d.key_micros ?? 'N/A';
-        const mech = d.mech_fn ?? 'N/A';
-        const srcs = d.sources_details ?? 'N/A';
-        const pct = estimatePercentRDA(d);
-        return `<tr><td>${esc(r.display)}</td><td>${esc(serving)}</td><td>${esc(keyN)}</td><td>${esc(mech)}</td><td>${esc(srcs)}</td><td>${esc(pct ?? 'N/A')}</td></tr>`;
-      }).join('');
-      return `
-        <h3>5. Micronutrient Benefits Table</h3>
-        <table class="bp-table">
-          <thead>
-            <tr>
-              <th>Ingredient</th>
-              <th>Serving Size</th>
-              <th>Key Nutrients/Bioactives</th>
-              <th>Mechanism/Function</th>
-              <th>Notable Sources/Details</th>
-              <th>% Recommended Daily Amount</th>
-            </tr>
-          </thead>
-          <tbody>${body}</tbody>
-        </table>
-        <div class="bp-footnote">%RDA shown when present/derivable in your CSVs; otherwise “N/A”.</div>
-      `;
-    }
-    function estimatePercentRDA(rec){
-      try{
-        const rows = rec._rows || [];
-        for (const row of rows){
-          for (const k in row){
-            const key = k.toLowerCase();
-            if (/%\s*rda/.test(key) || /rda_%/.test(key) || /percent[_\s]?rda/.test(key)){
-              const v = parseFloat(String(row[k]).replace(/[^\d\.\-]/g,''));
-              if (Number.isFinite(v)) return String(Math.round(v));
-            }
-          }
-        }
-        return null;
-      } catch { return null; }
-    }
-
-    // ---------- Injection ----------
-    async function injectTablesAfter(preEl, text){
-      if (!CFG.enableNutrition || !preEl) return;
-      await ensureDataLoaded();
-
-      if (preEl.nextElementSibling && preEl.nextElementSibling.classList?.contains('bp-after')){
-        preEl.nextElementSibling.remove();
-      }
-      const container = document.createElement('div');
-      container.className = 'bp-after';
-
-      const recipes = parseRecipesFromText(text);
-      if (!recipes.length){
-        container.innerHTML = '<div class="muted">No recognizable “Ingredients” section was found in the generated text.</div>';
-        preEl.insertAdjacentElement('afterend', container);
-        return;
-      }
-
-      recipes.forEach((R, idx)=>{
-        const sec = document.createElement('section');
-        sec.className = 'bp5stack';
-        sec.innerHTML = `
-          <h2 style="margin:8px 0">${esc(R.title || ('Recipe ' + (idx+1)))}</h2>
-          <h3>Ingredients</h3>
-          <ul>${R.ingredients.map(it=>`<li>${esc(it)}</li>`).join('')}</ul>
-          ${buildTablesForIngredients(R.ingredients)}
-        `;
-        container.appendChild(sec);
-      });
-
-      preEl.insertAdjacentElement('afterend', container);
-    }
-
-    // =========================
-    // GENERATE HANDLERS
-    // =========================
-    function buildRecipeSystemPrompt(count, explicitDish){
-      let base = `You are BrainPreserve’s recipe engine. Generate exactly ${count} brain-healthy recipe(s). For each recipe, include a clear title and a heading "Ingredients" followed by a bullet list with amounts. Respect user constraints strictly.`;
-      if (explicitDish){
-        base += ` If the request contains a specific dish (e.g., "${explicitDish}"), produce that dish only (or themed variants of that same dish) and do not add unrelated recipes.`;
-      }
-      return base;
-    }
-
-    async function generateFromCustom(){
-      setStatus('');
-      const out = $('#custom-output');
-      const custom = $('#custom-input').value.trim();
-      const numField = parseInt($('#num-recipes').value, 10);
-      const detected = detectDesiredCount(custom);
-      const count = Number.isFinite(numField) && numField>0 ? clamp(numField) : (detected || 5);
-      const dish = detectExplicitDish(custom);
-
-      const sys = buildRecipeSystemPrompt(count, dish);
-      const user = `Request: ${custom || 'Chef’s choice within brain-healthy constraints.'}`;
-
-      out.textContent = 'Generating...';
-      try{
-        const text = await callOpenAI([{ role:'system', content: sys }, { role:'user', content: user }]);
-        out.textContent = text || '(no text)';
-        await injectTablesAfter(out, text);
-      }catch(err){ out.textContent = 'Error: ' + err.message; }
-    }
-
-    function clearCustomSection(){
-      $('#custom-input').value = '';
-      $('#num-recipes').value = '';
-      const pre = $('#custom-output');
-      pre.textContent = '';
-      if (pre.nextElementSibling && pre.nextElementSibling.classList?.contains('bp-after')) pre.nextElementSibling.remove();
-    }
-
-    function renderIncludeAccordions(){
-      const root = $('#include-root'); root.innerHTML = '';
-      Object.entries(STARTER_INGREDIENTS).forEach(([cat, items])=>{
-        const catSlug = slugify(cat);
-        const acc = el('div', { class:'accordion' });
-        const header = el('div', { class:'acc-header', role:'button', tabindex:'0', 'aria-expanded':'false', onclick:'toggleAccordion(this)' },
-          el('h4', {}, cat),
-          el('span', { class:'muted' }, 'Click to expand')
-        );
-        const content = el('div', { class:'acc-content' });
-        const list = el('div', { class:'checks' });
-        items.forEach(val=>{
-          const id = `inc-${catSlug}-${slugify(val)}`;
-          const input = el('input', { type:'checkbox', id, value:val, 'data-cat':catSlug });
-          const label = el('label', { for:id }, input, val);
-          list.appendChild(label);
-        });
-        content.appendChild(list);
-        acc.appendChild(header); acc.appendChild(content);
-        root.appendChild(acc);
-      });
-    }
-    function renderChecks(containerId, items){
-      const root = document.getElementById(containerId); root.innerHTML = '';
-      items.forEach(v=>{
-        const id = `${containerId}-${slugify(v)}`;
-        const input = el('input', { type:'checkbox', id, value:v });
-        const label = el('label', { for:id }, input, v);
-        root.appendChild(label);
-      });
-    }
-    function getSelectedByCat(){
-      const inputs = document.querySelectorAll('input[type=checkbox][data-cat]');
-      const out = {};
-      inputs.forEach(i=>{
-        const cat = i.getAttribute('data-cat');
-        if (i.checked){ (out[cat] ||= []).push(i.value); }
-      });
-      return out;
-    }
-    function getSelected(containerId){
-      const root = document.getElementById(containerId);
-      const inputs = root ? root.querySelectorAll('input[type=checkbox]:checked') : [];
-      return Array.from(inputs).map(i=>i.value);
-    }
-    function collectForm(){
-      const selections = {};
-      Object.keys(STARTER_INGREDIENTS).forEach(cat=>{
-        const slug = slugify(cat);
-        selections[cat] = getSelectedByCat()[slug] || [];
-      });
-      const exclusions = getSelected('exc-categories');
-      const goals = getSelected('goals');
-      const numForm = parseInt($('#num-recipes-form')?.value, 10);
-      const count = Number.isFinite(numForm) && numForm > 0 ? clamp(numForm) : 5;
-      return { selections, exclusions, goals, count };
-    }
-    function buildPreviewText(data){
-      const parts = [];
-      for (const [cat, list] of Object.entries(data.selections)) {
-        if (list && list.length) parts.push(`${cat}: ${list.join(', ')}`);
-      }
-      if (data.exclusions?.length) parts.push(`Exclude categories: ${data.exclusions.join(', ')}`);
-      if (data.goals?.length) parts.push(`Goals: ${data.goals.join(', ')}`);
-      parts.push(`Number of recipes: ${data.count}`);
-      return parts.length ? parts.join('\n') : 'No selections yet.';
-    }
-
-    async function generateFromSelections(){
-      setStatus('Working…');
-      const form = collectForm();
-      $('#form-preview').textContent = buildPreviewText(form);
-
-      let out = $('#form-output');
-      if (!out){ out = document.createElement('pre'); out.id='form-output'; out.className='card'; document.querySelector('main').appendChild(out); }
-      out.textContent = 'Generating...';
-
-      try {
-        const selLines = Object.entries(form.selections)
-          .filter(([, list]) => list && list.length)
-          .map(([k, list]) => `${k}: ${list.join(', ')}`)
-          .join('\n');
-        const exc = form.exclusions?.length ? `Exclude categories: ${form.exclusions.join(', ')}` : '';
-        const goals = form.goals?.length ? `Goals: ${form.goals.join(', ')}` : '';
-
-        const sys = buildRecipeSystemPrompt(form.count, null);
-        const user = `Selections:\n${selLines || '(none)'}\n${exc}\n${goals}`;
-
-        const text = await callOpenAI([{ role:'system', content: sys }, { role:'user', content: user }]);
-        out.textContent = text || '(no text)';
-        await injectTablesAfter(out, text);
-
-        setStatus('Done.');
-      } catch(err){
-        out.textContent = '';
-        const errBox = el('div',{class:'error'}, 'Error during generation: ', String(err?.message || err));
-        out.replaceWith(errBox); errBox.id='form-output';
-        console.error(err);
-        setStatus('Error.');
+        Store.mergedByFood.set(key, rec);
       }
     }
 
-    function clearFormSelections(){
-      document.querySelectorAll('.checks input[type=checkbox]').forEach(i => { i.checked = false; });
-      $('#num-recipes-form').value = '';
-      $('#form-preview').textContent = 'No selections yet.';
-      const out = $('#form-output'); if (out) out.remove();
-      if (out && out.nextElementSibling && out.nextElementSibling.classList?.contains('bp-after')) out.nextElementSibling.remove();
-      setStatus('');
+    // Build foodsList for the UI
+    const set = new Set();
+    for(const [k, rec] of Store.mergedByFood.entries()){
+      // Pick a representative name to show
+      const name = Array.from(rec.__names)[0] || k;
+      set.add(name);
     }
+    Store.foodsList = Array.from(set).sort((a,b)=>a.localeCompare(b));
+  }
 
-    // =========================
-    // INIT
-    // =========================
-    (async function init(){
-      renderIncludeAccordions();
-      renderChecks('exc-categories', EXCLUDE_CATEGORIES);
-      renderChecks('goals', GOALS);
-      document.body.addEventListener('change', (e)=>{
-        if(e.target.closest('.checks')){
-          const form = collectForm();
-          $('#form-preview').textContent = buildPreviewText(form);
-        }
-      });
-      await ensureDataLoaded(); // preload CSVs
-    })();
+  // ===== UI Rendering =====
+  function setStatus(msg){ document.getElementById('statusText').textContent = msg; }
 
-    // Export handlers
-    window.generateFromSelections = generateFromSelections;
-    window.generateFromCustom     = generateFromCustom;
-    window.clearFormSelections    = clearFormSelections;
-    window.clearCustomSection     = clearCustomSection;
-    window.toggleAccordion        = toggleAccordion;
+  function populateDatalist(){
+    const dl = document.getElementById('foodList');
+    dl.innerHTML = '';
+    for(const name of Store.foodsList){
+      const opt = document.createElement('option'); opt.value = name; dl.appendChild(opt);
+    }
+  }
+
+  function findRecordByName(name){
+    if(!name) return null;
+    const key = U.canonFoodName(name);
+    if(Store.mergedByFood.has(key)) return Store.mergedByFood.get(key);
+    // fallback: try relaxed matching (startsWith)
+    const entry = Array.from(Store.mergedByFood.entries()).find(([k])=>k.startsWith(key));
+    return entry ? entry[1] : null;
+  }
+
+  function renderTable(name){
+    const rec = findRecordByName(name);
+    const section = document.getElementById('results');
+    const table = document.getElementById('nutritionTable');
+    const tags = document.getElementById('metaTags');
+    if(!rec){ section.style.display='none'; return; }
+
+    // Tags
+    const tagBits = [];
+    if(rec.category) tagBits.push(`<span class="tag">${rec.category}</span>`);
+    if(rec.mind) tagBits.push('<span class="tag">MIND</span>');
+    if(rec.mediterranean) tagBits.push('<span class="tag">Mediterranean</span>');
+    if(rec.dash) tagBits.push('<span class="tag">DASH</span>');
+    if(rec.microbiome_supporting) tagBits.push('<span class="tag">Microbiome-supporting</span>');
+    if(rec.key_micronutrients) tagBits.push(`<span class="tag">Micronutrients: ${rec.key_micronutrients}</span>`);
+    if(rec.cognitive_benefits) tagBits.push(`<span class="tag">Benefits: ${rec.cognitive_benefits}</span>`);
+    if(rec.mechanisms) tagBits.push(`<span class="tag">Mechanisms: ${rec.mechanisms}</span>`);
+    tags.innerHTML = tagBits.join(' ');
+
+    // Helper to print values preserving 0, but showing N/A for null/undefined
+    const fmt = (v, unit='') => (v===0 || Number.isFinite(v)) ? `${v}${unit}` : 'N/A';
+
+    table.innerHTML = `
+      <thead>
+        <tr><th>Field</th><th>Value</th><th>Source Files</th></tr>
+      </thead>
+      <tbody>
+        <tr><td>Serving Size</td><td>${rec.serving_size || 'N/A'}</td><td rowspan="11" class="small muted">${Array.from(rec.__sources).join(', ')}</td></tr>
+        <tr><td>Energy (kcal)</td><td>${fmt(rec.energy_kcal)}</td></tr>
+        <tr><td>Protein (g)</td><td>${fmt(rec.protein_g)}</td></tr>
+        <tr><td>Fiber (g)</td><td>${fmt(rec.fiber_g)}</td></tr>
+        <tr><td>Carbohydrates (g)</td><td>${fmt(rec.carbs_g)}</td></tr>
+        <tr><td>Fat (g)</td><td>${fmt(rec.fat_g)}</td></tr>
+        <tr><td>Sugars (g)</td><td>${fmt(rec.sugars_g)}</td></tr>
+        <tr><td>Sodium (mg)</td><td>${fmt(rec.sodium_mg)}</td></tr>
+        <tr><td>Glycemic Index (GI)</td><td>${fmt(rec.gi)}</td></tr>
+        <tr><td>Glycemic Load (per serving)</td><td>${fmt(rec.gl)}</td></tr>
+        <tr><td>DII (Dietary Inflammatory Index)</td><td>${fmt(rec.dii_score)}</td></tr>
+      </tbody>`;
+    section.style.display = '';
+  }
+
+  // ===== Diagnostics UI =====
+  function toggleDiagnostics(){
+    const el = document.getElementById('diagnostics');
+    el.style.display = (el.style.display === 'none' || !el.style.display) ? '' : 'none';
+  }
+  document.addEventListener('keydown', (e)=>{
+    if(e.ctrlKey && e.shiftKey && e.key.toLowerCase()==='d'){
+      toggleDiagnostics();
+    }
+  });
+
+  function renderAudit(){
+    const lines = [];
+    for(const [fname, audit] of Object.entries(Store.headerAudit)){
+      lines.push(`\n# ${fname}`);
+      if(!audit){ lines.push('  (no data)'); continue; }
+      lines.push('  Original headers:');
+      for(const h of audit.headers){ lines.push('   • '+h); }
+      lines.push('  Canonical headers:');
+      for(const h of audit.canonHeaders){ lines.push('   • '+h); }
+      lines.push('  Mapped → canonical keys:');
+      for(const [canonHeader, canonKey] of Object.entries(audit.headerMap)){
+        lines.push(`   • ${canonHeader}  →  ${canonKey}`);
+      }
+    }
+    document.getElementById('diagContent').textContent += '\n' + lines.join('\n');
+  }
+
+  // ===== Boot =====
+  async function boot(){
+    setStatus('Loading CSVs…');
+    await loadAll();
+    setStatus('Merging & normalizing…');
+    mergeAll();
+    populateDatalist();
+    setStatus('Ready. Type a food name and click “Show Nutrition”.');
+    renderAudit();
+  }
+
+  // Events
+  document.getElementById('reloadBtn').addEventListener('click', ()=>{
+    Store.baseUrl = document.getElementById('baseUrl').value || '';
+    boot().catch(err=>{ setStatus('Error: '+err.message); console.error(err); });
+  });
+  document.getElementById('showBtn').addEventListener('click', ()=>{
+    const name = document.getElementById('foodSearch').value;
+    renderTable(name);
+  });
+
+  // Auto-load once on first visit (no base URL)
+  boot().catch(err=>{ setStatus('Error: '+err.message); console.error(err); });
   </script>
 </body>
 </html>
