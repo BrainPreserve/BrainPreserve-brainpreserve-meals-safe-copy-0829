@@ -1,0 +1,6 @@
+table,output_header,mode,order,file,csv_column,role,combine_separator,notes
+microbiome,Ingredient/Food,priority_fallback,1,microbiome.csv,Food,primary,,Join/display name (alias Food⇄Foods supported)
+microbiome,Direct Cognitive Benefits,priority_fallback,1,microbiome.csv,Direct Cognitive Benefits,primary,,
+microbiome,Indirect Cognitive Benefits,priority_fallback,1,microbiome.csv,Inirect Cognitive Benefits,primary,,Uses exact header spelling 'Inirect' from your file
+microbiome,Recommended_Intake,priority_fallback,1,microbiome.csv,Recommended_Intake,primary,,
+microbiome,Pre_Pro_Post-Biotic,priority_fallback,1,microbiome.csv,Pre_Pro_Post-Biotic,primary,,

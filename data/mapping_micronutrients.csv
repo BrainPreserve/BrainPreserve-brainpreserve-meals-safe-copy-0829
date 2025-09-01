@@ -1,0 +1,7 @@
+table,output_header,mode,order,file,csv_column,role,combine_separator,notes
+micronutrients,Ingredient/Food,priority_fallback,1,micronutrients_food.csv,Foods,primary,,Join/display name (alias Food⇄Foods supported)
+micronutrients,Key Micronutrients/Bioactive Compounds,priority_fallback,1,micronutrients_food.csv,Key Micronutrients/Bioactive Compounds,primary,,
+micronutrients,Direct/Indirect Cognitive Benefits,priority_fallback,1,micronutrients_food.csv,Direct/Indirect Cognitive Benefits,primary,,
+micronutrients,Supporting Mechanisms,priority_fallback,1,micronutrients_food.csv,Supporting Mechanisms,primary,,
+micronutrients,RDA/Intake Guidance (from list),combine,1,micronutients_list.csv,Recommended Daily Amount,source,; ,Optional; looked up by micronutrient names appearing in 'Key Micronutrients/Bioactive Compounds'
+micronutrients,RDA/Intake Guidance (from list),combine,2,micronutients_list.csv,Recommended Daily Servings & Serving Size,source,; ,Optional; same lookup by micronutrient names

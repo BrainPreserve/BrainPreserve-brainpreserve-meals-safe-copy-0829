@@ -1,0 +1,10 @@
+table,output_header,mode,order,file,csv_column,role,combine_separator,notes
+diet_compat,Ingredient/Food,priority_fallback,1,diet_tool.csv,Foods,primary,,Join/display name (alias Food⇄Foods supported)
+diet_compat,Category,priority_fallback,1,diet_tool.csv,Category,primary,,Optional context
+diet_compat,Serving Size (Estimation),priority_fallback,1,diet_tool.csv,Serving Size (Estimation),primary,,Optional context
+diet_compat,MIND,priority_fallback,1,diet_tool.csv,✓MIND,primary,,✓/blank → Yes/No
+diet_compat,Mediterranean,priority_fallback,1,diet_tool.csv,✓Mediterranean,primary,,✓/blank → Yes/No
+diet_compat,DASH,priority_fallback,1,diet_tool.csv,✓DASH,primary,,✓/blank → Yes/No
+diet_compat,Microbiome-supporting,priority_fallback,1,diet_tool.csv,✓Microbiome-supporting,primary,,✓/blank → Yes/No
+diet_compat,Contextually Pro-inflammatory?,priority_fallback,1,diet_tool.csv,Contextually Pro-inflammatory?,primary,,As-is text/flag
+diet_compat,Caution: Contextual Inflammation Risk,priority_fallback,1,diet_tool.csv,Caution: Contextual Inflammation Risk,primary,,As-is text

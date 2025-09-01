@@ -1,0 +1,9 @@
+table,output_header,mode,order,file,csv_column,role,combine_separator,notes
+nutrition,Ingredient/Food,priority_fallback,1,main.csv,Foods,primary,,Join/display name (alias Food⇄Foods supported)
+nutrition,Calories,priority_fallback,1,main.csv,Calories,primary,,
+nutrition,Protein (g),priority_fallback,1,protein.csv,Protein_per_Serving_(g),primary,,
+nutrition,Fiber (g),priority_fallback,1,fiber.csv,Total Fiber (g),primary,,
+nutrition,GI,priority_fallback,1,gi_gl.csv,Glycemic Index (GI),primary,,
+nutrition,GL,priority_fallback,1,gi_gl.csv,Glycemic Load per Serving,primary,,
+nutrition,Anti-inflammatory score (lower is better),priority_fallback,1,diet_tool.csv,DII Score,primary,,"If numeric present, display that value."
+nutrition,Anti-inflammatory score (lower is better),priority_fallback,2,diet_tool.csv,✓ Anti-inflammatory,fallback,,"If DII missing and flag is truthy, display '✓ anti-inflammatory (no score)'; else N/A."

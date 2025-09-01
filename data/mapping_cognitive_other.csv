@@ -1,0 +1,7 @@
+table,output_header,mode,order,file,csv_column,role,combine_separator,notes
+cog_other,Cognitive benefits & mechanisms,combine,1,microbiome.csv,Direct Cognitive Benefits,source,; ,Primary cognitive text
+cog_other,Cognitive benefits & mechanisms,combine,2,main.csv,Mechanism/Function,source,; ,Mechanistic complement
+cog_other,Cognitive benefits & mechanisms,combine,3,micronutrients_food.csv,Supporting Mechanisms,source,; ,Additional mechanisms
+cog_other,Other Health Benefits,priority_fallback,1,microbiome.csv,Inirect Cognitive Benefits,primary,,Use exact header spelling from your file
+cog_other,Other Health Benefits,priority_fallback,2,micronutrients_food.csv,Supporting Mechanisms,fallback,,Used only if primary is empty
+cog_other,Other Health Benefits,priority_fallback,3,main.csv,Notable Sources/Details,optional_fallback,,Optional; remove if you don't want it
