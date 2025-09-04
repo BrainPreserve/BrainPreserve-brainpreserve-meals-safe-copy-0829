@@ -1,0 +1,80 @@
+
+/* nutrition-tables.css — minimal, neutral styling */
+.nt-root {
+  margin: 24px 0;
+  border-top: 1px solid #e5e7eb;
+  padding-top: 16px;
+  font-family: system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif;
+}
+
+.nt-controls {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+}
+
+.nt-status {
+  font-size: 0.95rem;
+  color: #4b5563;
+}
+
+.nt-btn, .nt-btn-secondary {
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #d1d5db;
+  cursor: pointer;
+  background: #f9fafb;
+  font-weight: 600;
+}
+
+.nt-btn:hover { background: #f3f4f6; }
+.nt-btn-secondary { background: #ffffff; }
+.nt-btn-secondary:hover { background: #f9fafb; }
+
+.nt-fallback {
+  margin-top: 8px;
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 12px;
+  padding: 8px 12px;
+}
+
+.nt-fallback textarea {
+  width: 100%;
+  margin: 8px 0;
+  padding: 8px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, Liberation Mono, monospace;
+  border: 1px solid #d1d5db;
+  border-radius: 8px;
+}
+
+.nt-section {
+  margin-top: 20px;
+}
+
+.nt-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  margin: 12px 0;
+}
+
+.nt-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.95rem;
+  margin-bottom: 8px;
+}
+
+.nt-table th, .nt-table td {
+  border: 1px solid #e5e7eb;
+  padding: 8px 10px;
+  text-align: left;
+  vertical-align: top;
+}
+
+.nt-table thead th {
+  background: #f3f4f6;
+  font-weight: 700;
+}
