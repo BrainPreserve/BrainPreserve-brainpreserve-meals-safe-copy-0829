@@ -51,17 +51,44 @@
   // If your files use different names/paths, change here (not in the code below).
   // All CSVs must include a primary ingredient key column (default "Ingredient" or synonyms defined below).
   const CSV_SOURCES = [
-    { name:'nutrition', url:'/data/nutrition.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:[
-      'Serving Size (g)','ServingSize','Serving Size','Calories (kcal)','Calories','Protein (g)','Protein','Fiber (g)','Fiber','Fat (g)','Fat','Carbs (g)','Carbohydrates (g)'
+    // ---- CORE NUTRITION (merged from multiple CSVs you already have) ----
+    { name:'main', url:'/data/main.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:[
+      'Serving Size (g)','ServingSize','Serving Size','Calories (kcal)','Calories','Fat (g)','Fat','Carbs (g)','Carbohydrates (g)','Carbohydrates'
     ]},
+    { name:'protein', url:'/data/protein.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:['Protein (g)','Protein_g','Protein'] },
+    { name:'fiber', url:'/data/fiber.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:['Fiber (g)','Fiber_g','Fiber'] },
+
+    // ---- GI / GL ----
     { name:'gi_gl', url:'/data/gi_gl.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:['GI','Glycemic Index','GL','Glycemic Load'] },
-    { name:'dii', url:'/data/dii.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:['DII','Anti-Inflammatory Score','Inflammatory Index'] },
-    { name:'cog', url:'/data/cognitive_benefits.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:['Direct Cognitive Benefits','Indirect Cognitive Benefits','Other Health Benefits'] },
-    { name:'diet', url:'/data/diet_tags.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:['MIND','DASH','Mediterranean','Low GI','Keto','Paleo','Vegan','Vegetarian','Gluten-Free','Dairy-Free'] },
-    { name:'micro', url:'/data/microbiome.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:['Microbiome Benefit','Prebiotic Fibers','Polyphenols'] },
-    { name:'micros', url:'/data/micronutrients.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:['Vitamin A','Vitamin C','Vitamin E','B12','Folate','Magnesium','Zinc','Iron','Potassium','Choline','Omega-3'] },
-    // Optional: synonyms CSV with two columns: Alias, Canonical
-    { name:'synonyms', url:'/data/synonyms.csv', keyCandidates:['Alias'], expectAnyOf:['Canonical'], optional:true }
+
+    // ---- DII and Diet Compatibility come from diet_tool.csv in your repo ----
+    { name:'diet_tool', url:'/data/diet_tool.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:[
+      'DII','Anti-Inflammatory Score','MIND','DASH','Mediterranean','Low GI','Keto','Paleo','Vegan','Vegetarian','Gluten-Free','Dairy-Free'
+    ]},
+
+    // ---- Cognitive & Other Health Benefits ----
+    { name:'cog', url:'/data/mapping_cognitive_other.csv', keyCandidates:['Ingredient','Food','Item','Canonical'], expectAnyOf:['Direct Cognitive Benefits','Indirect Cognitive Benefits','Other Health Benefits'] },
+
+    // ---- Microbiome ----
+    { name:'micro', url:'/data/microbiome.csv', keyCandidates:['Ingredient','Food','Item','Canonical'], expectAnyOf:['Microbiome Benefit','Prebiotic Fibers','Polyphenols'] },
+
+    // ---- Micronutrients ----
+    { name:'micros_food', url:'/data/micronutrients_food.csv', keyCandidates:['Ingredient','Food','Item','Canonical'], expectAnyOf:[
+      'Vitamin A','Vitamin C','Vitamin D','Vitamin E','Vitamin K','B1','B2','B3','B5','B6','B7','B9','B12','Folate','Choline','Calcium','Magnesium','Zinc','Iron','Selenium','Potassium','Manganese','Copper','Omega-3'
+    ]},
+    // Optional helper list (names/units) — merged if present
+    { name:'micros_list', url:'/data/micronutrients_list.csv', keyCandidates:['Ingredient','Food','Item','Canonical'], expectAnyOf:['Vitamin A','Vitamin C','Magnesium','Zinc'], optional:true },
+
+    // ---- Synonym maps (optional). If present, they add Alias->Canonical mappings so names line up across files. ----
+    { name:'syn_map_nutrition', url:'/data/mapping_nutrition.csv', keyCandidates:['Alias'], expectAnyOf:['Canonical'], optional:true },
+    { name:'syn_map_diet', url:'/data/mapping_diet_compat.csv', keyCandidates:['Alias'], expectAnyOf:['Canonical'], optional:true },
+    { name:'syn_map_micro', url:'/data/mapping_microbiome.csv', keyCandidates:['Alias'], expectAnyOf:['Canonical'], optional:true },
+    { name:'syn_map_micros', url:'/data/mapping_micronutrients.csv', keyCandidates:['Alias'], expectAnyOf:['Canonical'], optional:true },
+
+    // ---- Optional files present in your repo (ignored if columns not relevant) ----
+    { name:'categories', url:'/data/categories.csv', keyCandidates:['Ingredient','Category','Canonical'], expectAnyOf:['Category'], optional:true },
+    { name:'settings', url:'/data/settings_global.csv', keyCandidates:['Key','Setting'], expectAnyOf:['Value'], optional:true },
+    { name:'moder', url:'/data/moder.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:['Score','Mediterranean'], optional:true }
   ];
 
   // ------- Name normalization & synonyms -------
