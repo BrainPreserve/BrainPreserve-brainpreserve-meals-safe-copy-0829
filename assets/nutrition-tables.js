@@ -1,36 +1,35 @@
 
-/*! Nutrition Tables Add-on (Drop-in) v1.0
- *  Safe, isolated script to generate the 5 nutrition tables from your existing recipe output.
- *  Requires Papa Parse (CDN): 
+/*! Nutrition Tables Add-on (Drop-in) v1.2
+ *  Aligns with user's mapping files in /data:
+ *    - mapping_nutrition.csv          (macros, GI/GL, DII, portions)
+ *    - mapping_cognitive_other.csv    (benefit tags)
+ *    - mapping_diet_compat.csv        (diet compatibility Y/N)
+ *    - mapping_microbiome.csv         (microbiome tags)
+ *    - mapping_micronutrients.csv     (top micronutrients)
+ *  Optional:
+ *    - settings_global.csv            (may contain alias/canonical pairs)
+ *
+ *  Requires Papa Parse (CDN):
  *    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
  *
- *  Installation (short form):
- *  - Upload this file as /assets/nutrition-tables.js (or anywhere you like).
- *  - Upload nutrition-tables.css and link it in <head>.
- *  - Put your CSV files into /data/ (or update CSV_BASE_URL below).
- *  - Add the <div id="nutrition-tables-root"></div> just below your recipe output.
- *  - Add the script tag for Papa Parse and then this file before </body>.
- *
- *  This script will not modify your existing recipe generator. It only reads the
- *  rendered recipe text and builds the 5 tables below it. If it can't find the recipe
- *  automatically, it provides a paste-box fallback.
+ *  Safe add-on: does NOT modify your recipe generator.
+ *  It only reads rendered recipe text and appends five tables below it.
  */
 (function () {
   "use strict";
 
-  // ---------- CONFIG (edit these to match your repo) ----------
+  // ---------- CONFIG (edit these ONLY if your paths/names differ) ----------
   const CONFIG = {
     CSV_BASE_URL: "/data/", // folder where your CSVs live; include trailing slash
     FILES: {
-      aliases: "Ingredient_Aliases.csv",
-      main: "Main.csv",
-      benefits: "Cognitive_Benefits.csv",
-      diet: "Diet_Compatibility.csv",
-      microbiome: "Microbiome_Benefits.csv",
-      micronutrients: "Micronutrient_Benefits.csv"
+      settings: "settings_global.csv",          // set to null if not present
+      main: "mapping_nutrition.csv",
+      benefits: "mapping_cognitive_other.csv",
+      diet: "mapping_diet_compat.csv",
+      microbiome: "mapping_microbiome.csv",
+      micronutrients: "mapping_micronutrients.csv"
     },
     // Candidate selectors where your app renders the recipe text.
-    // The script will search these in order and use the first one found.
     SELECTORS_RECIPE_CANDIDATES: [
       "#recipeOutput",
       "#generatedRecipe",
@@ -41,36 +40,35 @@
     ],
     // Where to inject the tables UI; if not found, we append near the end of <body>.
     TABLES_ROOT_SELECTOR: "#nutrition-tables-root",
-    // If your data uses different header names, add them as aliases below.
+    // Header aliases to tolerate different column names
     FIELD_ALIASES: {
-      canonical: ["canonical","ingredient","food","item","name"],
-      alias: ["alias","synonym","alt","alt_name"],
+      canonical: ["canonical","canonical_name","ingredient","food","item","name"],
+      alias: ["alias","synonym","alt","alt_name","alias_name"],
 
-      // Macro / core measures (numbers; per 100g is preferred if available)
-      calories: ["calories","kcal","energy_kcal"],
-      protein_g: ["protein","protein_g","prot_g"],
-      fiber_g: ["fiber","fibre","fiber_g","dietary_fiber_g"],
-      carbs_g: ["carbs","carbohydrates","carbohydrate_g","net_carb_g","carb_g"],
-      fat_g: ["fat","fat_g","total_fat_g"],
+      // Macro / core measures (per 100 g by default if that's how your data is stored)
+      calories: ["calories","kcal","energy_kcal","kcal_per100","calories_per100"],
+      protein_g: ["protein","protein_g","prot_g","protein_per100_g","protein_per100"],
+      fiber_g: ["fiber","fibre","fiber_g","dietary_fiber_g","fiber_per100_g"],
+      carbs_g: ["carbs","carbohydrates","carbohydrate_g","net_carb_g","carb_g","carbs_per100_g"],
+      fat_g: ["fat","fat_g","total_fat_g","fat_per100_g"],
       gi: ["gi","glycemic_index","GI"],
       gl: ["gl","glycemic_load","GL"],
       dii: ["dii","anti-inflammatory_score","inflammatory_index","DII"],
 
       // Base amounts
       per_100g_flag: ["per_100g","per100g","basis_100g"],
-      serving_size_g: ["serving_size_g","serving_g","portion_g","default_portion_g","portion_size_g"],
+      serving_size_g: ["serving_size_g","serving_g","portion_g","default_portion_g","portion_size_g","serving_g_estimate"],
 
-      // Diet tags (boolean or Y/N)
-      // Add/leave as-is; script finds whatever columns exist.
+      // Diet tags (detected dynamically if present)
       diet_tags: ["MIND","DASH","Mediterranean","Vegan","Vegetarian","Pescatarian","Gluten-Free","Keto","Paleo","Low-FODMAP"],
 
-      // Benefit tags (free text or delimited)
-      benefit_cols: ["benefits","neuro_benefits","cognitive_benefits","tags"],
+      // Benefit tags
+      benefit_cols: ["benefits","neuro_benefits","cognitive_benefits","tags","cognitive_other"],
 
-      // Microbiome signals (free text or delimited)
+      // Microbiome signals
       microbiome_cols: ["microbiome","microbiome_benefits","gut_tags","taxa"],
 
-      // Micronutrients (free text or delimited; or separate columns)
+      // Micronutrients
       micronutrient_cols: ["micronutrients","nutrients","top_micronutrients"]
     },
 
@@ -81,7 +79,7 @@
       pasteFallbackPlaceholder: "Paste the full recipe here, including an 'Ingredients' section...",
       statusLoading: "Loading CSV datasets and analyzing recipe...",
       statusDone: "Tables generated.",
-      statusErrorCSV: "Could not load one or more CSV files. Check file names and CSV_BASE_URL in CONFIG.",
+      statusErrorCSV: "Could not load one or more required CSV files. Check file names and CSV_BASE_URL in CONFIG.",
       statusErrorPapa: "Papa Parse is missing. Add the CDN script tag noted at the top of this file."
     }
   };
@@ -100,15 +98,6 @@
       if (candidates.includes(k)) return row[k];
     }
     return undefined;
-  }
-
-  function findFirstExistingColumnName(headerRowKeys, candidates) {
-    const keysLower = headerRowKeys.map(k => k.toLowerCase());
-    for (const cand of candidates) {
-      const idx = keysLower.indexOf(String(cand).toLowerCase());
-      if (idx !== -1) return headerRowKeys[idx];
-    }
-    return null;
   }
 
   function textContains(a, b) {
@@ -131,45 +120,74 @@
         header: true,
         dynamicTyping: true,
         skipEmptyLines: true,
-        complete: results => resolve(results.data),
+        complete: results => resolve(results.data || []),
         error: err => reject(err)
       });
     });
+  }
+
+  // Optional loader: returns [] if missing or fails
+  async function loadCSVOptional(url) {
+    try {
+      const rows = await loadCSV(url);
+      return Array.isArray(rows) ? rows : [];
+    } catch (_) {
+      return [];
+    }
   }
 
   async function loadDatasets() {
     const base = CONFIG.CSV_BASE_URL;
     const files = CONFIG.FILES;
     try {
-      const [aliases, main, benefits, diet, microbiome, micronutrients] = await Promise.all([
-        loadCSV(base + files.aliases),
+      const promises = [
+        files.settings ? loadCSVOptional(base + files.settings) : Promise.resolve([]),
         loadCSV(base + files.main),
         loadCSV(base + files.benefits),
         loadCSV(base + files.diet),
         loadCSV(base + files.microbiome),
         loadCSV(base + files.micronutrients)
-      ]);
-      return { aliases, main, benefits, diet, microbiome, micronutrients };
+      ];
+      const [settings, main, benefits, diet, microbiome, micronutrients] = await Promise.all(promises);
+      return { settings, main, benefits, diet, microbiome, micronutrients };
     } catch (e) {
       console.error(e);
-      throw new Error(CONFIG.UI.statusErrorCSV + " Details: " + e.message);
+      throw new Error(CONFIG.UI.statusErrorCSV + " Details: " + (e.message || e));
     }
   }
 
-  // Build alias -> canonical map and canonical sets
-  function buildAliasMap(aliasesRows) {
+  // Build alias map from any table that has alias + canonical columns
+  function buildAliasMapFromRows(rows) {
     const A = CONFIG.FIELD_ALIASES;
-    const map = new Map(); // alias (lowercased) -> canonical (canonical case preserved as first seen)
+    const map = new Map();
     const canonicalSet = new Set();
-    for (const r of aliasesRows || []) {
+    for (const r of rows || []) {
       const alias = getField(r, A.alias);
       const canonical = getField(r, A.canonical) || alias;
-      if (alias) {
-        map.set(String(alias).trim().toLowerCase(), String(canonical).trim());
-        canonicalSet.add(String(canonical).trim());
-      }
+      if (!alias) continue;
+      const aliasKey = String(alias).trim().toLowerCase();
+      const canonVal = String(canonical || "").trim();
+      if (!aliasKey || !canonVal) continue;
+      if (!map.has(aliasKey)) map.set(aliasKey, canonVal);
+      canonicalSet.add(canonVal);
     }
     return { map, canonicalSet };
+  }
+
+  // Build canonical universe directly from Main.csv too (for fallback mapping)
+  function canonicalUniverseFromMain(mainRows) {
+    const A = CONFIG.FIELD_ALIASES;
+    const set = new Set();
+    for (const r of mainRows || []) {
+      const canon = (
+        getField(r, A.canonical) ||
+        getField(r, ["ingredient","food","name","item"]) ||
+        ""
+      );
+      const c = String(canon).trim();
+      if (c) set.add(c.toLowerCase()); // store lowercase for matching
+    }
+    return set;
   }
 
   // Build lookups by canonical for each dataset
@@ -177,7 +195,6 @@
     const A = CONFIG.FIELD_ALIASES;
     const byCanon = new Map();
     for (const r of rows || []) {
-      // try canonical; fall back to ingredient/food/name if canonical missing
       const canon = (
         getField(r, A.canonical) ||
         getField(r, ["ingredient","food","name","item"]) ||
@@ -185,15 +202,36 @@
       );
       const c = String(canon).trim();
       if (!c) continue;
-      if (!byCanon.has(c)) byCanon.set(c, []);
-      byCanon.get(c).push(r);
+      const key = c; // keep original case for display
+      if (!byCanon.has(key)) byCanon.set(key, []);
+      byCanon.get(key).push(r);
     }
     return byCanon;
   }
 
-  // Extract ingredients from current page's recipe HTML (best-effort)
+  // Parse ingredients from recipe text
+  function extractIngredientsFromText(text) {
+    if (!text) return [];
+    const lines = String(text).split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+    // find "Ingredients" header
+    let startIdx = lines.findIndex(s => /^ingredients\b/i.test(s));
+    if (startIdx === -1) startIdx = 0;
+    const ingredients = [];
+    for (let i = startIdx + (lines[startIdx] && /^ingredients\b/i.test(lines[startIdx]) ? 1 : 0); i < lines.length; i++) {
+      const L = lines[i];
+      if (!L) break;
+      if (/^(directions|instructions|method|steps)\b/i.test(L)) break;
+      if (/^[-*•\d.)\]]\s*/.test(L) || /cup|tbsp|tsp|oz|g|gram|ml|lb|teaspoon|tablespoon|ounce|liter|litre|cup/i.test(L)) {
+        ingredients.push(L.replace(/^[-*•\d.)\]]\s*/, "").trim());
+        continue;
+      }
+      if (/serv(es|ings)|prep time|cook time|yield|nutrition/i.test(L)) break;
+      if (L.split(" ").length <= 8) ingredients.push(L);
+    }
+    return ingredients.filter(Boolean);
+  }
+
   function extractIngredientsFromDOM() {
-    // Try candidates
     for (const sel of CONFIG.SELECTORS_RECIPE_CANDIDATES) {
       const el = document.querySelector(sel);
       if (el && (visible(el) || el.textContent.trim().length > 0)) {
@@ -202,85 +240,64 @@
         if (parsed && parsed.length) return parsed;
       }
     }
-    // Search for 'Ingredients' header pattern anywhere
     const allText = document.body.innerText || document.body.textContent || "";
     const parsed = extractIngredientsFromText(allText);
     if (parsed && parsed.length) return parsed;
-
-    // Nothing found
     return null;
   }
 
-  // Parse ingredients from recipe text, looking for an "Ingredients" section
-  function extractIngredientsFromText(text) {
-    if (!text) return [];
-    const lines = String(text).split(/\r?\n/).map(s => s.trim()).filter(Boolean);
-    // find "Ingredients" header
-    let startIdx = lines.findIndex(s => /^ingredients\b/i.test(s));
-    if (startIdx === -1) {
-      // fallback: take first 15 lines as possible ingredient list (best effort)
-      startIdx = 0;
-    }
-    // Collect lines until we hit a blank line or a line that looks like a direction header
-    const ingredients = [];
-    for (let i = startIdx + (lines[startIdx] && /^ingredients\b/i.test(lines[startIdx]) ? 1 : 0); i < lines.length; i++) {
-      const L = lines[i];
-      if (!L) break;
-      if (/^(directions|instructions|method|steps)\b/i.test(L)) break;
-      // bullet markers
-      if (/^[-*•\d.)\]]\s*/.test(L) || /cup|tbsp|tsp|oz|g|gram|ml|lb|teaspoon|tablespoon|ounce|liter|litre|cup/i.test(L)) {
-        ingredients.push(L.replace(/^[-*•\d.)\]]\s*/, "").trim());
-        continue;
-      }
-      // stop when we get to a section that clearly isn't ingredients
-      if (/serv(es|ings)|prep time|cook time|yield|nutrition/i.test(L)) break;
-      // include short, ingredient-looking lines
-      if (L.split(" ").length <= 8) ingredients.push(L);
-    }
-    return ingredients.filter(Boolean);
-  }
-
-  // Clean an ingredient line into a matchable key (remove qty, units, forms, punctuation)
+  // Clean an ingredient line into a matchable key
   function normalizeIngredientLine(line) {
     let s = String(line).toLowerCase();
-    // remove fractions and numbers (e.g., 1 1/2, ½, etc.)
     s = s.replace(/(\d+\/\d+)|[¼½¾⅓⅔⅛⅜⅝⅞]|\b\d+(\.\d+)?\b/g, " ").trim();
-    // remove units
     s = s.replace(/\b(cups?|cup|tbsp|tablespoons?|tbsps?|tsp|teaspoons?|tsps?|oz|ounce|ounces|g|grams?|kg|kilograms?|ml|milliliters?|liter|litre|lbs?|pounds?)\b/g, " ");
-    // remove descriptors/forms
     s = s.replace(/\b(chopped|minced|diced|sliced|ground|fresh|large|small|medium|ripe|raw|cooked|drained|rinsed|packed|peeled|seeded|to taste)\b/g, " ");
-    // keep only letters, spaces, and hyphens
     s = s.replace(/[^a-z\s\-]/g, " ");
     s = s.replace(/\s+/g, " ").trim();
-    // normalize plurals
     if (s.endsWith("es")) s = s.slice(0, -2);
     else if (s.endsWith("s")) s = s.slice(0, -1);
     return s.trim();
   }
 
-  // Map a normalized line to canonical name using aliases, else fallback heuristics
-  function mapToCanonical(norm, aliasMap, canonicalUniverse) {
+  // Map normalized text to canonical name
+  function mapToCanonical(norm, explicitAliasMap, canonicalUniverseLower, mainCanonicalsLower) {
     if (!norm) return null;
-    // direct alias match
-    const direct = aliasMap.get(norm);
-    if (direct) return { canonical: direct, confidence: 1.0 };
 
-    // try progressive shortening (e.g., "baby spinach" -> "spinach")
-    const parts = norm.split(" ").filter(Boolean);
-    for (let i = 0; i < parts.length; i++) {
-      const tail = parts.slice(i).join(" ");
-      const hit = aliasMap.get(tail);
-      if (hit) return { canonical: hit, confidence: 0.9 - i * 0.05 };
+    // 1) explicit alias map (settings_global.csv if present)
+    if (explicitAliasMap && explicitAliasMap.size) {
+      const direct = explicitAliasMap.get(norm);
+      if (direct) return { canonical: direct, confidence: 1.0 };
+      const parts = norm.split(" ").filter(Boolean);
+      for (let i = 0; i < parts.length; i++) {
+        const tail = parts.slice(i).join(" ");
+        const hit = explicitAliasMap.get(tail);
+        if (hit) return { canonical: hit, confidence: 0.9 - i * 0.05 };
+      }
+      for (const [alias, canon] of explicitAliasMap.entries()) {
+        if (norm.includes(alias)) return { canonical: canon, confidence: 0.6 };
+      }
     }
 
-    // try contains
-    for (const [alias, canon] of aliasMap.entries()) {
-      if (textContains(norm, alias)) return { canonical: canon, confidence: 0.6 };
+    // 2) fallback: try direct match against main canonical names (lowercased set)
+    if (mainCanonicalsLower && mainCanonicalsLower.size) {
+      if (mainCanonicalsLower.has(norm)) return { canonical: norm, confidence: 0.95 };
+      let best = null;
+      for (const c of mainCanonicalsLower) {
+        if (norm === c) { best = { canonical: c, confidence: 0.95 }; break; }
+        if (norm.endsWith(" " + c) || norm.startsWith(c + " ") || norm.includes(c)) {
+          const conf = Math.min(0.9, 0.55 + c.length / Math.max(8, norm.length));
+          if (!best || conf > best.confidence) best = { canonical: c, confidence: conf };
+        }
+      }
+      if (best) return best;
     }
 
-    // final fallback: if any canonical is contained in the norm
-    for (const canon of canonicalUniverse) {
-      if (textContains(norm, canon)) return { canonical: canon, confidence: 0.5 };
+    // 3) try any canonical universe from alias source
+    if (canonicalUniverseLower && canonicalUniverseLower.size) {
+      for (const c of canonicalUniverseLower) {
+        if (norm === c) return { canonical: c, confidence: 0.75 };
+        if (norm.includes(c)) return { canonical: c, confidence: 0.65 };
+      }
     }
 
     return null;
@@ -293,16 +310,12 @@
     return Number.isFinite(n) ? n : null;
   }
 
-  // Attempt to find a base amount to scale per-100g values. Priority:
-  // 1) explicit serving_size_g / portion_g in data
-  // 2) assume 100g as fallback
   function resolvePortionGrams(row, A) {
     const explicit = num(row, A.serving_size_g);
     if (explicit && explicit > 0) return explicit;
-    return 100; // sane fallback if only per-100g available
+    return 100;
   }
 
-  // When we have per-100g data on macros, scale by portion_g
   function computeMacros(row, A, portion_g) {
     const calories = num(row, A.calories);
     const protein_g = num(row, A.protein_g);
@@ -312,20 +325,16 @@
     const gi = num(row, A.gi);
     const gl = num(row, A.gl);
     const dii = num(row, A.dii);
-
-    // If values already look like "per portion", we still scale by portion/100 if the dataset was per 100g.
-    // Heuristic: if carbs_g > 40 and portion is small, likely per 100g; otherwise treat as per-portion values.
     const scale = portion_g / 100;
-
     return {
       calories: isFinite(calories) ? calories * scale : null,
       protein_g: isFinite(protein_g) ? protein_g * scale : null,
       fiber_g: isFinite(fiber_g) ? fiber_g * scale : null,
       carbs_g: isFinite(carbs_g) ? carbs_g * scale : null,
       fat_g: isFinite(fat_g) ? fat_g * scale : null,
-      gi: isFinite(gi) ? gi : null, // GI does not scale with mass
-      gl: isFinite(gl) ? gl * scale : null, // GL roughly scales with carbs
-      dii: isFinite(dii) ? dii : null // use weighted average later
+      gi: isFinite(gi) ? gi : null,
+      gl: isFinite(gl) ? gl * scale : null,
+      dii: isFinite(dii) ? dii : null
     };
   }
 
@@ -334,19 +343,15 @@
     return Number(x).toFixed(digits);
   }
 
-  // Build a simple table element
   function makeTable(titleText, headers, rows) {
     const wrap = document.createElement("section");
     wrap.className = "nt-section";
-
     const h2 = document.createElement("h2");
     h2.className = "nt-title";
     h2.textContent = titleText;
     wrap.appendChild(h2);
-
     const table = document.createElement("table");
     table.className = "nt-table";
-
     const thead = document.createElement("thead");
     const hr = document.createElement("tr");
     headers.forEach(h => {
@@ -356,7 +361,6 @@
     });
     thead.appendChild(hr);
     table.appendChild(thead);
-
     const tbody = document.createElement("tbody");
     rows.forEach(r => {
       const tr = document.createElement("tr");
@@ -368,12 +372,10 @@
       tbody.appendChild(tr);
     });
     table.appendChild(tbody);
-
     wrap.appendChild(table);
     return wrap;
   }
 
-  // Convert tables to Markdown for easy copy
   function toMarkdownTable(headers, rows) {
     const headerLine = "| " + headers.join(" | ") + " |";
     const sep = "| " + headers.map(()=>"---").join(" | ") + " |";
@@ -395,17 +397,14 @@
     container.appendChild(btn);
   }
 
-  // Build UI root
   function ensureUIRoot() {
     let root = document.querySelector(CONFIG.TABLES_ROOT_SELECTOR);
     if (!root) {
-      // create a root near end of body to avoid breaking layout
       root = document.createElement("div");
       root.id = CONFIG.TABLES_ROOT_SELECTOR.replace("#", "");
       document.body.appendChild(root);
     }
     root.classList.add("nt-root");
-    // Add button + status + optional paste fallback UI
     if (!root.querySelector(".nt-controls")) {
       const controls = document.createElement("div");
       controls.className = "nt-controls";
@@ -438,7 +437,6 @@
       fallback.appendChild(go);
       root.appendChild(fallback);
     }
-    // Clear previous tables container
     let tables = root.querySelector(".nt-tables");
     if (!tables) {
       tables = document.createElement("div");
@@ -454,7 +452,6 @@
     if (el) el.textContent = msg || "";
   }
 
-  // Public: generate from DOM (best effort)
   window.generateTablesFromLatestRecipe = async function () {
     const root = ensureUIRoot();
     const tables = root.querySelector(".nt-tables");
@@ -462,8 +459,14 @@
     setStatus(CONFIG.UI.statusLoading);
     try {
       const datasets = await loadDatasets();
-      const { aliases, main, benefits, diet, microbiome, micronutrients } = datasets;
-      const { map: aliasMap, canonicalSet } = buildAliasMap(aliases);
+      const { settings, main, benefits, diet, microbiome, micronutrients } = datasets;
+
+      // Build alias map from settings_global if it contains alias+canonical
+      const aliasFromSettings = buildAliasMapFromRows(settings);
+      const aliasMap = aliasFromSettings.map;
+      const aliasCanonSetLower = new Set(Array.from(aliasFromSettings.canonicalSet).map(s => String(s).toLowerCase()));
+
+      const mainCanonLower = canonicalUniverseFromMain(main);
 
       const lines = extractIngredientsFromDOM();
       if (!lines || !lines.length) {
@@ -471,7 +474,7 @@
         alert("Couldn't auto-detect ingredients from the page. Please use the 'Paste the recipe text' fallback.");
         return;
       }
-      await buildAllTables(lines, datasets, aliasMap, canonicalSet, tables);
+      await buildAllTables(lines, { settings, main, benefits, diet, microbiome, micronutrients }, aliasMap, aliasCanonSetLower, mainCanonLower, tables);
       setStatus(CONFIG.UI.statusDone);
     } catch (e) {
       setStatus("");
@@ -479,7 +482,6 @@
     }
   };
 
-  // Public: generate from pasted text
   window.generateTablesFromRecipeText = async function (text) {
     const root = ensureUIRoot();
     const tables = root.querySelector(".nt-tables");
@@ -487,8 +489,13 @@
     setStatus(CONFIG.UI.statusLoading);
     try {
       const datasets = await loadDatasets();
-      const { aliases, main, benefits, diet, microbiome, micronutrients } = datasets;
-      const { map: aliasMap, canonicalSet } = buildAliasMap(aliases);
+      const { settings, main, benefits, diet, microbiome, micronutrients } = datasets;
+
+      const aliasFromSettings = buildAliasMapFromRows(settings);
+      const aliasMap = aliasFromSettings.map;
+      const aliasCanonSetLower = new Set(Array.from(aliasFromSettings.canonicalSet).map(s => String(s).toLowerCase()));
+
+      const mainCanonLower = canonicalUniverseFromMain(main);
 
       const lines = extractIngredientsFromText(text);
       if (!lines || !lines.length) {
@@ -496,7 +503,7 @@
         alert("No ingredients found in the pasted text.");
         return;
       }
-      await buildAllTables(lines, datasets, aliasMap, canonicalSet, tables);
+      await buildAllTables(lines, { settings, main, benefits, diet, microbiome, micronutrients }, aliasMap, aliasCanonSetLower, mainCanonLower, tables);
       setStatus(CONFIG.UI.statusDone);
     } catch (e) {
       setStatus("");
@@ -504,7 +511,7 @@
     }
   };
 
-  async function buildAllTables(lines, datasets, aliasMap, canonicalSet, tablesContainer) {
+  async function buildAllTables(lines, datasets, aliasMap, aliasCanonSetLower, mainCanonLower, tablesContainer) {
     const A = CONFIG.FIELD_ALIASES;
     const mainIdx = indexByCanonical(datasets.main);
     const dietIdx = indexByCanonical(datasets.diet);
@@ -517,15 +524,19 @@
     for (const line of lines) {
       const norm = normalizeIngredientLine(line);
       if (!norm) continue;
-      const m = mapToCanonical(norm, aliasMap, canonicalSet);
+      const m = mapToCanonical(norm, aliasMap, aliasCanonSetLower, mainCanonLower);
       if (m) {
-        mapped.push({ line, norm, canonical: m.canonical, confidence: m.confidence });
+        // canonical may be lower-cased; use best-case key from indexes if available
+        let canonicalDisplay = m.canonical;
+        for (const key of mainIdx.keys()) {
+          if (String(key).toLowerCase() === String(m.canonical).toLowerCase()) { canonicalDisplay = key; break; }
+        }
+        mapped.push({ line, norm, canonical: canonicalDisplay, confidence: m.confidence });
       } else {
         mapped.push({ line, norm, canonical: null, confidence: 0 });
       }
     }
 
-    // Build per-ingredient rows from "main" dataset
     const perIngredient = [];
     let total = { calories: 0, protein_g: 0, fiber_g: 0, carbs_g: 0, fat_g: 0, gl: 0 };
     let giWeightedCarb = 0;
@@ -554,7 +565,6 @@
         ...mac
       });
 
-      // Aggregate
       if (mac.calories !== null) total.calories += mac.calories;
       if (mac.protein_g !== null) total.protein_g += mac.protein_g;
       if (mac.fiber_g !== null) total.fiber_g += mac.fiber_g;
@@ -606,7 +616,6 @@
     const t2Headers = ["Ingredient","Benefits"];
     const t2Rows = perIngredient.map(r => {
       const rows = benIdx.get(r.canonical || "") || [];
-      // concat benefit columns
       const benefitCols = CONFIG.FIELD_ALIASES.benefit_cols;
       const tags = new Set();
       for (const br of rows) {
@@ -622,7 +631,6 @@
     tablesContainer.appendChild(t2);
 
     // ---------- Table 3: Diet Compatibility ----------
-    // Discover diet tag columns by scanning first row headers
     const dietRowsAny = datasets.diet || [];
     const dietHeaders = dietRowsAny.length ? Object.keys(dietRowsAny[0]) : [];
     const knownDietCols = CONFIG.FIELD_ALIASES.diet_tags.filter(col => dietHeaders.some(h => h.toLowerCase() === col.toLowerCase()));
@@ -630,7 +638,6 @@
     const t3Rows = [];
     if (knownDietCols.length) {
       for (const dietName of knownDietCols) {
-        // If ANY ingredient has an explicit "No" for this diet, we mark "No"
         let anyNo = false, anyUnknown = false;
         const offenders = [];
         for (const r of perIngredient) {
@@ -640,10 +647,7 @@
           const vStr = String(v || "").trim().toLowerCase();
           if (!vStr) { anyUnknown = true; continue; }
           const isYes = vStr === "y" || vStr === "yes" || vStr === "true" || vStr === "1";
-          if (!isYes) {
-            anyNo = true;
-            offenders.push(r.ingredient);
-          }
+          if (!isYes) { anyNo = true; offenders.push(r.ingredient); }
         }
         let compat = "Yes";
         let notes = "";
@@ -695,7 +699,5 @@
     tablesContainer.appendChild(t5);
   }
 
-  // Initialize UI root at load (harmless if already present)
   document.addEventListener("DOMContentLoaded", ensureUIRoot);
 })();
-
