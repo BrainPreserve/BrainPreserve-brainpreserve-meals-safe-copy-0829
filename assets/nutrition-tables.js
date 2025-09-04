@@ -52,43 +52,43 @@
   // All CSVs must include a primary ingredient key column (default "Ingredient" or synonyms defined below).
   const CSV_SOURCES = [
     // ---- CORE NUTRITION (merged from multiple CSVs you already have) ----
-    { name:'main', url:'/data/main.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:[
-      'Serving Size (g)','ServingSize','Serving Size','Calories (kcal)','Calories','Fat (g)','Fat','Carbs (g)','Carbohydrates (g)','Carbohydrates'
+    { name:'main', url:'/data/main.csv', keyCandidates:['Ingredient','Food','Item','Name','Canonical','Canonical Name','Ingredient Name','Food Name','Display','Display Name'], expectAnyOf:[
+      'Serving Size (g)','ServingSize','Serving Size','Calories (kcal)','Calories','Fat (g)','Fat','Carbs (g)','Carbohydrates (g)','Carbohydrates','Protein (g)','Protein','Fiber (g)','Fiber','GI','GL','DII','Anti-Inflammatory Score','Key Micronutrients','Diet Tags','Microbiome Benefit Score'
     ]},
-    { name:'protein', url:'/data/protein.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:['Protein (g)','Protein_g','Protein'] },
-    { name:'fiber', url:'/data/fiber.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:['Fiber (g)','Fiber_g','Fiber'] },
+    { name:'protein', url:'/data/protein.csv', keyCandidates:['Ingredient','Food','Item','Name','Canonical','Canonical Name','Ingredient Name','Food Name'], expectAnyOf:['Protein (g)','Protein_g','Protein'] },
+    { name:'fiber', url:'/data/fiber.csv', keyCandidates:['Ingredient','Food','Item','Name','Canonical','Canonical Name','Ingredient Name','Food Name'], expectAnyOf:['Fiber (g)','Fiber_g','Fiber'] },
 
     // ---- GI / GL ----
-    { name:'gi_gl', url:'/data/gi_gl.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:['GI','Glycemic Index','GL','Glycemic Load'] },
+    { name:'gi_gl', url:'/data/gi_gl.csv', keyCandidates:['Ingredient','Food','Item','Name','Canonical','Canonical Name','Ingredient Name','Food Name'], expectAnyOf:['GI','Glycemic Index','GL','Glycemic Load'] },
 
     // ---- DII and Diet Compatibility come from diet_tool.csv in your repo ----
-    { name:'diet_tool', url:'/data/diet_tool.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:[
+    { name:'diet_tool', url:'/data/diet_tool.csv', keyCandidates:['Ingredient','Food','Item','Name','Canonical','Canonical Name','Ingredient Name','Food Name'], expectAnyOf:[
       'DII','Anti-Inflammatory Score','MIND','DASH','Mediterranean','Low GI','Keto','Paleo','Vegan','Vegetarian','Gluten-Free','Dairy-Free'
     ]},
 
     // ---- Cognitive & Other Health Benefits ----
-    { name:'cog', url:'/data/mapping_cognitive_other.csv', keyCandidates:['Ingredient','Food','Item','Canonical'], expectAnyOf:['Direct Cognitive Benefits','Indirect Cognitive Benefits','Other Health Benefits'] },
+    { name:'cog', url:'/data/mapping_cognitive_other.csv', keyCandidates:['Ingredient','Food','Item','Name','Canonical','Canonical Name'], expectAnyOf:['Direct Cognitive Benefits','Indirect Cognitive Benefits','Other Health Benefits'] },
 
     // ---- Microbiome ----
-    { name:'micro', url:'/data/microbiome.csv', keyCandidates:['Ingredient','Food','Item','Canonical'], expectAnyOf:['Microbiome Benefit','Prebiotic Fibers','Polyphenols'] },
+    { name:'micro', url:'/data/microbiome.csv', keyCandidates:['Ingredient','Food','Item','Name','Canonical','Canonical Name'], expectAnyOf:['Microbiome Benefit','Prebiotic Fibers','Polyphenols','Microbiome Benefit Score'] },
 
     // ---- Micronutrients ----
-    { name:'micros_food', url:'/data/micronutrients_food.csv', keyCandidates:['Ingredient','Food','Item','Canonical'], expectAnyOf:[
-      'Vitamin A','Vitamin C','Vitamin D','Vitamin E','Vitamin K','B1','B2','B3','B5','B6','B7','B9','B12','Folate','Choline','Calcium','Magnesium','Zinc','Iron','Selenium','Potassium','Manganese','Copper','Omega-3'
+    { name:'micros_food', url:'/data/micronutrients_food.csv', keyCandidates:['Ingredient','Food','Item','Name','Canonical','Canonical Name'], expectAnyOf:[
+      'Vitamin A','Vitamin C','Vitamin D','Vitamin E','Vitamin K','B1','B2','B3','B5','B6','B7','B9','B12','Folate','Choline','Calcium','Magnesium','Zinc','Iron','Selenium','Potassium','Manganese','Copper','Omega-3','Key Micronutrients'
     ]},
     // Optional helper list (names/units) — merged if present
-    { name:'micros_list', url:'/data/micronutrients_list.csv', keyCandidates:['Ingredient','Food','Item','Canonical'], expectAnyOf:['Vitamin A','Vitamin C','Magnesium','Zinc'], optional:true },
+    { name:'micros_list', url:'/data/micronutrients_list.csv', keyCandidates:['Ingredient','Food','Item','Name','Canonical','Canonical Name'], expectAnyOf:['Vitamin A','Vitamin C','Magnesium','Zinc'], optional:true },
 
     // ---- Synonym maps (optional). If present, they add Alias->Canonical mappings so names line up across files. ----
-    { name:'syn_map_nutrition', url:'/data/mapping_nutrition.csv', keyCandidates:['Alias'], expectAnyOf:['Canonical'], optional:true },
-    { name:'syn_map_diet', url:'/data/mapping_diet_compat.csv', keyCandidates:['Alias'], expectAnyOf:['Canonical'], optional:true },
-    { name:'syn_map_micro', url:'/data/mapping_microbiome.csv', keyCandidates:['Alias'], expectAnyOf:['Canonical'], optional:true },
-    { name:'syn_map_micros', url:'/data/mapping_micronutrients.csv', keyCandidates:['Alias'], expectAnyOf:['Canonical'], optional:true },
+    { name:'syn_map_nutrition', url:'/data/mapping_nutrition.csv', keyCandidates:['Alias','alias','ALIAS'], expectAnyOf:['Canonical','canonical','CANONICAL'], optional:true },
+    { name:'syn_map_diet', url:'/data/mapping_diet_compat.csv', keyCandidates:['Alias','alias','ALIAS'], expectAnyOf:['Canonical','canonical','CANONICAL'], optional:true },
+    { name:'syn_map_micro', url:'/data/mapping_microbiome.csv', keyCandidates:['Alias','alias','ALIAS'], expectAnyOf:['Canonical','canonical','CANONICAL'], optional:true },
+    { name:'syn_map_micros', url:'/data/mapping_micronutrients.csv', keyCandidates:['Alias','alias','ALIAS'], expectAnyOf:['Canonical','canonical','CANONICAL'], optional:true },
 
     // ---- Optional files present in your repo (ignored if columns not relevant) ----
-    { name:'categories', url:'/data/categories.csv', keyCandidates:['Ingredient','Category','Canonical'], expectAnyOf:['Category'], optional:true },
-    { name:'settings', url:'/data/settings_global.csv', keyCandidates:['Key','Setting'], expectAnyOf:['Value'], optional:true },
-    { name:'moder', url:'/data/moder.csv', keyCandidates:['Ingredient','Food','Item'], expectAnyOf:['Score','Mediterranean'], optional:true }
+    { name:'categories', url:'/data/categories.csv', keyCandidates:['Ingredient','Food','Item','Name','Canonical','Canonical Name'], expectAnyOf:['Category','Diet Tags','Tags'], optional:true },
+    { name:'settings', url:'/data/settings_global.csv', keyCandidates:['Key','Setting','Name'], expectAnyOf:['Value'], optional:true },
+    { name:'moder', url:'/data/moder.csv', keyCandidates:['Ingredient','Food','Item','Name','Canonical','Canonical Name'], expectAnyOf:['Score','Mediterranean','DII'], optional:true }
   ];
 
   // ------- Name normalization & synonyms -------
@@ -125,7 +125,21 @@
   }
 
   function chooseKeyColumn(row, candidates){
+    // 1) Exact header match
     const cols = Object.keys(row||{});
+    for (const cand of candidates){ if (cols.includes(cand)) return cand; }
+    // 2) Loose match (normalize header names)
+    for (const c of cols){ const cn = normalize(c); if (['ingredient','food','item','name','canonical','canonical name','ingredient name','food name','display','display name'].includes(cn)) return c; }
+    // 3) Heuristic: choose the column with the highest count of non-numeric, non-empty, mostly-unique strings
+    let bestCol = null, bestScore = -1;
+    const seenCols = cols.slice(0, 50); // safety
+    for (const c of seenCols){
+      let nonEmpty=0, stringy=0; const uniq = new Set();
+      for (let i=0;i<50 && i<window.__TMP_ROWS_LEN__;++i){/* placeholder; replaced below */}
+    }
+    // Since we don't have rows here, this fallback is implemented in detectKeyColumn
+    return null;
+  });
     for (const cand of candidates){ if (cols.includes(cand)) return cand; }
     // Try loose match
     for (const c of cols){ if (normalize(c)==='ingredient') return c; }
@@ -135,6 +149,31 @@
   function detectColumns(rows){
     if (!rows || !rows.length) return new Set();
     return new Set(Object.keys(rows[0]));
+  }
+  function detectKeyColumn(rows, candidates){
+    if (!rows || !rows.length) return null;
+    // Try candidate and loose matches on the first row
+    let col = chooseKeyColumn(rows[0], candidates);
+    if (col) return col;
+    // Heuristic over up to first 500 rows
+    const cols = Object.keys(rows[0]);
+    let bestCol = null, bestScore = -1;
+    const N = Math.min(rows.length, 500);
+    for (const c of cols){
+      let nonEmpty=0, stringy=0; const uniq = new Set();
+      for (let i=0;i<N;i++){
+        const v = rows[i][c];
+        if (v==null || String(v).trim()==='') continue;
+        nonEmpty++;
+        const s = String(v).trim();
+        const isNum = !isNaN(Number(s)) && s !== '';
+        if (!isNum){ stringy++; uniq.add(s.toLowerCase()); }
+      }
+      // Prefer columns with many non-empty string values and high uniqueness
+      const score = (stringy*2) + uniq.size - (cols.length>30?5:0);
+      if (stringy>=Math.max(10, N*0.3) && uniq.size>=Math.max(10, N*0.3) && score>bestScore){ bestScore=score; bestCol=c; }
+    }
+    return bestCol; // could still be null; caller will throw a clear error
   }
 
   function addSynonym(alias, canonical){
@@ -172,7 +211,7 @@
           const rows = await fetchCsv(cfg.url);
           if ((!rows || rows.length===0) && cfg.optional) continue; 
           if (!rows || rows.length===0) throw new Error('No data rows');
-          const keyCol = chooseKeyColumn(rows[0], cfg.keyCandidates);
+          const keyCol = detectKeyColumn(rows, cfg.keyCandidates);
           if (!keyCol) throw new Error(`Cannot find key column among: ${cfg.keyCandidates.join(', ')}`);
           State.keyColByDataset[cfg.name] = keyCol;
           const cols = detectColumns(rows);
