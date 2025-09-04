@@ -40,6 +40,9 @@
     .status{font-size:12px;color:#475467;margin-top:8px}
     .error{color:#b42318;background:#fef3f2;border:1px solid #fed7d7;padding:8px;border-radius:8px;margin-top:8px}
   </style>
+
+  <!-- Nutrition Tables Add-On (Block 1: CSS) -->
+  <link rel="stylesheet" href="/assets/nutrition-tables.css">
 </head>
 <body>
   <main>
@@ -111,11 +114,15 @@
       <!-- Nutrition table & coaching -->
       <div id="nutrition-root" class="card" style="display:none"></div>
     </section>
+
+    <!-- Nutrition Tables Add-On (Block 2: Root placeholder for 5 tables) -->
+    <div id="nutrition-tables-root"></div>
   </main>
 
-  <!-- CSV parser -->
+  <!-- CSV parser (already present) -->
   <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
+  <!-- Your existing app script (unchanged) -->
   <script>
     // =========================
     // CONFIG
@@ -506,5 +513,8 @@ ${goals}`;
     window.clearCustomSection     = clearCustomSection;
     window.toggleAccordion        = toggleAccordion;
   </script>
+
+  <!-- Nutrition Tables Add-On (Block 3: JS; requires Papa already loaded) -->
+  <script src="/assets/nutrition-tables.js"></script>
 </body>
 </html>
