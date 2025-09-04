@@ -3,287 +3,508 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Brain‑Healthy Meal Generator — Standalone (CSV + Mapping)</title>
+  <title>Brain Healthy Meal Generator — Standalone</title>
   <style>
     :root{ --bg:#f7f8fb; --fg:#111; --muted:#667085; --card:#fff; --line:#e5e7eb; --accent:#0a60ff; }
     *{box-sizing:border-box}
     body{font-family:system-ui,Segoe UI,Roboto,Arial,sans-serif;margin:0;background:var(--bg);color:var(--fg)}
-    main{max-width:1100px;margin:28px auto;padding:0 16px}
+    main{max-width:980px;margin:28px auto;padding:0 16px}
     h1{margin:0 0 8px}
-    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:16px;margin:12px 0}
-    label{display:block;font-weight:600;margin:8px 0 6px}
-    textarea{width:100%;padding:10px;border:1px solid var(--line);border-radius:10px}
-    button{border:0;background:var(--accent);color:#fff;padding:10px 14px;border-radius:12px;font-weight:700;cursor:pointer}
-    table{width:100%;border-collapse:collapse;margin:10px 0;border:1px solid var(--line)}
-    th,td{border:1px solid var(--line);padding:8px;text-align:left;vertical-align:top}
-    th{background:#f2f4f7}
-    .muted{color:var(--muted);font-size:14px}
-    .chip{display:inline-block;border:1px solid var(--line);padding:2px 8px;border-radius:999px;margin:2px 6px 2px 0;background:#fff}
-    details{margin:8px 0}
-    .ok{color:#0d9488}.warn{color:#c2410c}.bad{color:#b91c1c}
-    code{background:#eef2ff;padding:2px 6px;border-radius:6px}
+    h2{margin:0 0 8px}
+    .subtitle{color:#475467;margin:0 0 12px}
+    .card{background:var(--card);border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 4px 14px rgba(0,0,0,.04);margin:18px 0}
+    textarea{width:100%;padding:12px;border:1px solid #d0d5dd;border-radius:12px}
+    .row{display:flex;align-items:center;gap:10px;margin:10px 0}
+    input[type="number"]{width:120px;padding:10px;border:1px solid #d0d5dd;border-radius:12px}
+    button{padding:10px 14px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:12px;cursor:pointer}
+    button.ghost{border-color:#d0d5dd;background:#fff;color:#111}
+    button:disabled{opacity:.6;cursor:not-allowed}
+    .btn-row{display:flex;gap:10px;flex-wrap:wrap}
+    /* HIGH CONTRAST recipe/coaching output */
+    pre{white-space:pre-wrap;background:#ffffff;color:#111111;padding:14px;border-radius:12px;min-height:48px;margin-top:12px;border:1px solid #e5e7eb}
+    .grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+    @media (max-width:860px){.grid{grid-template-columns:1fr}}
+    .accordion{border:1px dashed #d6d6d6;border-radius:12px;margin:10px 0;overflow:hidden;background:#fff}
+    .acc-header{display:flex;justify-content:space-between;align-items:center;padding:12px 14px;background:#f9fafb;cursor:pointer}
+    .acc-header h4{margin:0;font-size:15px}
+    .acc-content{display:none;padding:12px 14px;background:#fff}
+    .acc-content.open{display:block}
+    .checks{display:flex;flex-wrap:wrap;gap:8px}
+    .checks label{display:inline-flex;align-items:center;gap:8px;padding:6px 10px;border:1px solid #e5e7eb;border-radius:10px}
+    .muted{color:#667085;font-size:13px;margin:0 0 6px}
+    table{width:100%; border-collapse:collapse; border:1px solid #e5e7eb; border-radius:12px; overflow:hidden}
+    th, td{padding:10px; border-bottom:1px solid #f1f5f9}
+    thead tr{background:#f9fafb}
+    th{ text-align:left; vertical-align:top; white-space:normal; word-wrap:break-word }
+    td.num{ text-align:right }
+    .status{font-size:12px;color:#475467;margin-top:8px}
+    .error{color:#b42318;background:#fef3f2;border:1px solid #fed7d7;padding:8px;border-radius:8px;margin-top:8px}
   </style>
 </head>
 <body>
   <main>
-    <h1>Tables Builder (CSV → 5 Tables via Mapping)</h1>
-    <p class="muted">Novice‑mode: this page <b>auto‑loads</b> everything from your repo’s <code>/data/</code> folder. You don’t paste URLs.</p>
+    <h1>Brain Healthy Meal Generator</h1>
+    <p class="subtitle">Choose ingredients, set goals, or type a custom request. Recipes and coaching appear inline—no new tab.</p>
 
-    <div class="card">
-      <h2>1) Status</h2>
-      <div id="status" class="muted">Checking /data/…</div>
-    </div>
-
-    <div class="card">
-      <h2>2) Ingredients / Recipe</h2>
-      <label>Type comma‑separated ingredients (restricted to items found in your whitelisted files)</label>
-      <textarea id="ingredients_input" rows="3" placeholder="eggs, spinach, cherry tomatoes, olive oil"></textarea>
-      <div style="margin-top:10px;display:flex;gap:8px;align-items:center">
-        <button id="btn_build">Build Tables</button>
-        <button id="btn_clear" style="background:#475569">Clear</button>
-        <span class="muted">Parsed items: <span id="parsed"></span></span>
+    <!-- A) Custom Request -->
+    <section class="card">
+      <h2>Custom Request</h2>
+      <p>Example: “Make 3 dinners with salmon and legumes, dairy-free, low sodium.” Leave the number blank to default to 3–5 recipes.</p>
+      <textarea id="custom-input" rows="4" placeholder="Describe the meal(s) you want..."></textarea>
+      <div class="row">
+        <label for="num-recipes">Number of recipes (optional):</label>
+        <input id="num-recipes" type="number" min="1" max="10" placeholder="3–5" />
       </div>
-    </div>
+      <div class="btn-row">
+        <button onclick="generateFromCustom()">Generate Recipes</button>
+        <button class="ghost" type="button" onclick="clearCustomSection()">Clear Custom</button>
+      </div>
+      <pre id="custom-output"></pre>
+    </section>
 
-    <div class="card">
-      <h2>3) Output</h2>
-      <div id="warnings" class="muted"></div>
-      <div id="tables"></div>
-    </div>
+    <!-- B) Build From Ingredients -->
+    <section class="card">
+      <h2>Build From Ingredients</h2>
+      <p>Select ingredients to include and categories to exclude. Your selections preview below.</p>
 
-    <details class="card">
-      <summary><b>How this works</b></summary>
-      <ul>
-        <li>Reads <b>settings_global.csv</b> for <i>join key</i> (default <code>Foods</code> with alias <code>Food</code>) and <i>whitelist</i> (e.g., <code>main.csv|categories.csv</code>).</li>
-        <li>Reads the 5 mapping CSVs to know which file/column populates each output column. Modes:
-          <ul>
-            <li><b>priority_fallback</b>: use the first non‑empty source, else fallbacks.</li>
-            <li><b>combine</b>: merge all non‑empty sources, de‑duplicate, join with separator (e.g., <code>; </code>).</li>
-          </ul>
-        </li>
-        <li>Truthy ✓ flags: ✓, ✔, yes, true, y, 1 (case‑insensitive).</li>
-        <li>Whitelist: only foods present in the listed files are allowed.</li>
-      </ul>
-    </details>
+      <div class="grid">
+        <div>
+          <h3>Include Ingredients</h3>
+          <div id="include-root"></div>
+        </div>
+
+        <div>
+          <div class="accordion" id="exclude-accordion">
+            <div class="acc-header" role="button" tabindex="0" aria-expanded="false" onclick="toggleAccordion(this)">
+              <h4>Exclude Categories</h4>
+              <span class="muted">Click to expand</span>
+            </div>
+            <div class="acc-content">
+              <p class="muted">Check entire categories to exclude them (e.g., “Dairy”).</p>
+              <div class="checks" id="exc-categories"></div>
+            </div>
+          </div>
+
+          <div class="accordion" id="goals-accordion">
+            <div class="acc-header" role="button" tabindex="0" aria-expanded="false" onclick="toggleAccordion(this)">
+              <h4>Nutrition Goals</h4>
+              <span class="muted">Click to expand</span>
+            </div>
+            <div class="acc-content">
+              <p class="muted">Select one or more goals to tailor coaching suggestions.</p>
+              <div class="checks" id="goals"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <h3>Preview</h3>
+      <pre id="form-preview">No selections yet.</pre>
+
+      <div class="btn-row">
+        <button onclick="generateFromSelections()">Generate Recipes from Selections</button>
+        <button class="ghost" type="button" onclick="clearFormSelections()">Clear Form</button>
+      </div>
+
+      <div id="status" class="status"></div>
+
+      <!-- Nutrition table & coaching -->
+      <div id="nutrition-root" class="card" style="display:none"></div>
+    </section>
   </main>
 
-<script>
-const $ = id => document.getElementById(id);
-const norm = s => (s||'').toLowerCase().replace(/[^a-z0-9+\s]/g,'').replace(/\s+/g,' ').trim();
-const truthy = v => {
-  const t = (v||'').toString().toLowerCase().trim();
-  return ['✓','✔','yes','true','y','1'].some(x=>t===x || (v||'').toString().includes('✓'));
-};
+  <!-- CSV parser -->
+  <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
 
-function parseCSV(text){
-  const rows=[]; let row=[]; let cell=''; let q=false;
-  for(let i=0;i<text.length;i++){
-    const c=text[i]; const n=text[i+1];
-    if(c==='"'){
-      if(q && n==='"'){ cell+='"'; i++; }
-      else { q=!q; }
-    } else if(c===',' && !q){ row.push(cell); cell=''; }
-    else if((c==='
-' || c==='
-') && !q){ if(cell!==''||row.length){ row.push(cell); rows.push(row); row=[]; cell=''; } }
-    else { cell+=c; }
-  }
-  if(cell!==''||row.length){ row.push(cell); rows.push(row); }
-  if(!rows.length) return {headers:[], data:[]};
-  const headers = rows[0].map(h=>h.trim());
-  const data = rows.slice(1).filter(r=>r.some(x=>x!=='')).map(r=>Object.fromEntries(headers.map((h,i)=>[h, r[i]!==undefined?r[i].trim():'' ])));
-  return {headers, data};
-}
-
-async function fetchCSV(path){
-  const res = await fetch(path, {cache:'no-store'});
-  if(!res.ok) throw new Error(`${path} (${res.status})`);
-  return parseCSV(await res.text());
-}
-
-const DATA_BASE = './data/';
-const MAPPING_FILES = {
-  nutrition: 'mapping_nutrition.csv',
-  cog_other: 'mapping_cognitive_other.csv',
-  diet_compat: 'mapping_diet_compat.csv',
-  microbiome: 'mapping_microbiome.csv',
-  micronutrients: 'mapping_micronutrients.csv'
-};
-
-async function loadSettings(){
-  let joinKey = 'Foods';
-  let whitelist = ['main.csv','categories.csv'];
-  try{
-    const s = await fetchCSV(DATA_BASE+'settings_global.csv');
-    for(const r of s.data){
-      if((r.setting||'').toLowerCase()==='joinkey' && r.value) joinKey = r.value.trim();
-      if((r.setting||'').toLowerCase()==='whitelist' && r.value) whitelist = r.value.split('|').map(x=>x.trim()).filter(Boolean);
-    }
-  }catch(e){}
-  return {joinKey, whitelist, joinKeyAliases: ['Foods','Food']};
-}
-
-async function loadMappings(){
-  const rows=[]; const missing=[];
-  for(const [key,file] of Object.entries(MAPPING_FILES)){
-    try{
-      const m = await fetchCSV(DATA_BASE+file);
-      for(const r of m.data){ r.__table = key; rows.push(r); }
-    }catch(e){ missing.push(file); }
-  }
-  return {rows, missing};
-}
-
-function detectKey(headers, pref, aliases){
-  if(headers.includes(pref)) return pref;
-  for(const a of aliases){ if(headers.includes(a)) return a; }
-  for(const g of ['Ingredient','ingredient','item','Item']){ if(headers.includes(g)) return g; }
-  return pref;
-}
-
-function groupBy(arr, key){ const m=new Map(); for(const r of arr){ const k=r[key]; if(!m.has(k)) m.set(k,[]); m.get(k).push(r);} return m; }
-
-async function loadDataFiles(mappingRows, settings){
-  const needed = new Set();
-  for(const r of mappingRows){ if(r.file) needed.add(r.file.trim()); }
-  for(const w of settings.whitelist){ needed.add(w.trim()); }
-
-  const datasets = {};
-  for(const file of needed){
-    try{
-      const csv = await fetchCSV(DATA_BASE+file);
-      const keyName = detectKey(csv.headers, settings.joinKey, settings.joinKeyAliases);
-      const idx = new Map();
-      for(const row of csv.data){ const k = norm(row[keyName]); if(k) idx.set(k,row); }
-      datasets[file] = { headers: csv.headers, rows: csv.data, index: idx, keyName };
-    }catch(e){ datasets[file] = { error: e.message } }
-  }
-  return datasets;
-}
-
-function renderTable(title, headers, rows){
-  const tbl = document.createElement('table');
-  const thead = document.createElement('thead');
-  const trh = document.createElement('tr');
-  headers.forEach(h=>{ const th=document.createElement('th'); th.textContent=h; trh.appendChild(th); });
-  thead.appendChild(trh); tbl.appendChild(thead);
-  const tbody = document.createElement('tbody');
-  for(const r of rows){ const tr=document.createElement('tr'); for(const h of headers){ const td=document.createElement('td'); td.textContent = r[h] ?? 'N/A'; tr.appendChild(td);} tbody.appendChild(tr);} tbl.appendChild(tbody);
-  const wrap=document.createElement('div');
-  const h2=document.createElement('h3'); h2.textContent=title; wrap.appendChild(h2); wrap.appendChild(tbl);
-  return wrap;
-}
-
-function extractIngredients(text){
-  const raw = text.split(/[\n,;]+/g).map(s=>s.trim()).filter(Boolean);
-  const seen=new Set(); const out=[]; for(const r of raw){ const k=norm(r); if(k && !seen.has(k)){ seen.add(k); out.push(r); } }
-  return out;
-}
-
-function cellValue(row, col){ if(!row) return ''; let v = row[col]; return (v===undefined||v===null)?'':String(v).trim(); }
-
-function resolvePriorityFallback(sources, itemKey, datasets, tableKey, outHeader){
-  for(const s of sources.sort((a,b)=>Number(a.order)-Number(b.order))){
-    const ds = datasets[s.file]; if(!ds || ds.error) continue; const row = ds.index.get(itemKey); const val = cellValue(row, s.csv_column);
-    if(!val) continue;
-    if(outHeader.toLowerCase().includes('anti-inflammatory') && s.role!== 'primary'){
-      if(truthy(val)) return '✓ anti-inflammatory (no score)'; else continue;
-    }
-    if(tableKey==='diet_compat' && s.csv_column && s.csv_column.includes('✓')){
-      return truthy(val) ? 'Yes' : 'No';
-    }
-    return val;
-  }
-  return 'N/A';
-}
-
-function resolveCombine(sources, itemKey, datasets){
-  const vals=[]; let sep='; ';
-  for(const s of sources.sort((a,b)=>Number(a.order)-Number(b.order))){
-    const ds = datasets[s.file]; if(!ds || ds.error) continue; const row = ds.index.get(itemKey); const val = cellValue(row, s.csv_column);
-    if(val){ if(s.combine_separator) sep=s.combine_separator; if(!vals.includes(val)) vals.push(val); }
-  }
-  return vals.length? vals.join(sep) : 'N/A';
-}
-
-function buildHeadersForTable(mappingRows){
-  const headers = new Set(['Ingredient/Food']);
-  for(const r of mappingRows){ if(r.output_header && r.output_header !== 'Ingredient/Food') headers.add(r.output_header); }
-  return Array.from(headers);
-}
-
-async function build(){
-  const status = $('status'); const warnings = $('warnings'); const out = $('tables');
-  warnings.innerHTML=''; out.innerHTML='';
-
-  const ingredients = extractIngredients($('ingredients_input').value.trim());
-  $('parsed').innerHTML = ingredients.map(x=>`<span class="chip">${x}</span>`).join('');
-
-  let settings, mappingLoad; 
-  try { settings = await loadSettings(); mappingLoad = await loadMappings(); }
-  catch(e){ status.innerHTML = `<span class="bad">Failed to load settings/mappings: ${e.message}</span>`; return; }
-
-  if(mappingLoad.missing.length){ status.innerHTML = `<span class="warn">Missing mapping files:</span> ${mappingLoad.missing.join(', ')}. Continue with available.`; }
-  else { status.innerHTML = `<span class="ok">✔ Found all mapping files.</span>`; }
-
-  const datasets = await loadDataFiles(mappingLoad.rows, settings);
-
-  const allowed = new Set();
-  for(const f of settings.whitelist){ const ds = datasets[f]; if(!ds||ds.error) continue; for(const row of ds.rows){ const k = norm(row[ds.keyName]); if(k) allowed.add(k); } }
-
-  const accepted=[]; const blocked=[];
-  for(const raw of ingredients){ const k = norm(raw); if(allowed.has(k)) accepted.push({raw, key:k}); else blocked.push(raw); }
-  if(blocked.length){ warnings.innerHTML += `<div><span class="warn">Blocked by whitelist:</span> ${blocked.join(', ')}.</div>`; }
-  if(!accepted.length){ warnings.innerHTML += `<div><span class="bad">No valid ingredients after whitelist.</span></div>`; return; }
-
-  const byTable = groupBy(mappingLoad.rows, '__table');
-
-  for(const [tableKey, rows] of byTable.entries()){
-    const byHeader = groupBy(rows, 'output_header');
-    const headers = buildHeadersForTable(rows);
-    const tableRows=[];
-
-    for(const ing of accepted){
-      const rowOut = {'Ingredient/Food': ing.raw};
-      for(const [outHeader, sources] of byHeader.entries()){
-        if(outHeader==='Ingredient/Food') continue;
-        const mode = (sources[0].mode||'priority_fallback').toLowerCase();
-        let val = 'N/A';
-        if(mode==='combine') val = resolveCombine(sources, ing.key, datasets);
-        else val = resolvePriorityFallback(sources, ing.key, datasets, tableKey, outHeader);
-        rowOut[outHeader] = val;
+  <script>
+    // =========================
+    // CONFIG
+    // =========================
+    const CFG = {
+      generateEndpoint: '/.netlify/functions/generate',
+      enableNutrition: false,  // <<<<<<<<<<  OFF for now (turn to true when you want tables)
+      datasets: {
+        categories:          'data/categories.csv',
+        diet_tool:           'data/diet_tool.csv',
+        fiber:               'data/fiber.csv',
+        gi_gl:               'data/gi_gl.csv',
+        main:                'data/main.csv',
+        microbiome:          'data/microbiome.csv',
+        micronutrients_list: 'data/micronutrients_list.csv',
+        micronutrients_food: 'data/micronutrients_food.csv',
+        moder:               'data/moder.csv',
+        protein:             'data/protein.csv'
       }
-      tableRows.push(rowOut);
+    };
+
+    // =========================
+    // INGREDIENT CATEGORIES (static UI source)
+    // =========================
+    const STARTER_INGREDIENTS = {
+      "Vegetables": ["GPT CHOOSES VEGETABLES","Arugula","Collard Greens","Kale","Mustard Greens","Romaine","Spinach","Swiss Chard","Broccoli","Brussel Sprouts","Cabbage","Cauliflower","Bell Peppers","Chili Peppers","Eggplant","Tomatoes","Beets","Carrots","Sweet Potatoes","Artichokes","Asparagus","Celery","Cucumber","Onions","Zucchini","Mushrooms","Cornmeal (whole grain)","Blue Corn","Sweet Corn","Grits (whole grain, cooked)","Heirloom Corn","Hominy Corn","Purple Corn","Polenta (cooked)"],
+      "Legumes": ["GPT CHOOSES LEGUMES","Chickpeas","Edamame","Green Peas","Lentils","Lupins","Miso","Natto","Peanuts","Soybeans","Split Peas","Tempeh","Tofu","Adzuki Beans","Black Beans","Kidney Beans","Mung Beans","Navy Beans","Pinto beans"],
+      "Fruit": ["GPT CHOOSES FRUIT","Apples","Avocados","Blackberries","Blueberries","Cranberries","Golgi Berries","Gooseberries","Grapes","Kiwis","Mulberries","Olives","Passion Fruit","Raspberries","Strawberries","Orange","Grapefruit","Lemon","Cherries","Watermelon","Black currants (Dried)","Bilberries (Dried)","Cranberries (Dried)","Prunes","Dates","Figs","Raisins","Gooseberries (Dried)","Mulberries (Dried)"],
+      "Fish": ["GPT CHOOSES FISH","Anchovies","Herring","Mackerel","Salmon","Sardines","Flounder","Sea Bass","Sturgeon","Trout","Yellow Catfish"],
+      "Whole Grains": ["GPT CHOOSES WHOLE GRAINS","Amaranth","Barley","Brown Rice","Farro","Millet","Oats/Oat Groats/Steel Cut/Rolled","Quinoa","Whole Grain (Bread)","Whole Wheat"],
+      "Nuts/Seeds": ["GPT CHOOSES NUTS OR SEEDS","Almonds","Almond Milk","Brazil Nuts","Cashews","Hazelnuts","Macadamia Nuts","Pecans","Pistachios","Walnuts","Chia Seeds","Flaxseeds","Pumpkin Seeds","Sesame Seeds","Sunflower Seeds"],
+      "Meat": ["GPT CHOOSES THE MEAT","Chicken Breast (skinless)","Turkey","Lamb","Pork Liver"],
+      "Pasta": ["GPT CHOOSES PASTA","Beet Pasta","Brown Rice Pasta","Buckwheat (Soba) Noodles","Chickpea Pasta","Lentil Pasta","Quinoa Pasta","Semolina Pasta","Sourdough Pasta","Spelt Pasta","Spinach Pasta","Whole Grain Pasta (non-wheat options)","Whole Wheat Pasta"],
+      "Dairy": ["GPT CHOOSES DAIRY","Asiago Cheese","Brie Cheese","Blue Cheese","Camembert Cheese","Cheddar Cheese","Edam Cheese","Gouda Cheese","Gruyère Cheese","Parmesan Cheese","Provolone Cheese","Romano Cheese","Swiss Cheese","Cottage Cheese","Feta Cheese","Limburger Cheese","Mozzarella Cheese (if fermented)","Tilsit Cheese","Yogurt (Fermented)","Low-fat Milk","Kefir"],
+      "Oils": ["GPT CHOOSES THE OIL","Avocado Oil (Cold-pressed, expeller-pressed)","Olive Oil (Extra Virgin -Cold-pressed)","Algae Oil","Cod Liver Oil","Krill Oil","Seaweed OIl","Chia Seed Oil","Flaxseed Oil","Hemp Seed Oil","Camellia Oil","Canola/Rapeseed Oil","Peony Oil","Pomegranate Seed Oiil","Safflower Oil","Sesame Oil","Soybean Oil","Sunflower Oil","Walnut Oil"],
+      "Fermented Foods": ["Apple Cider Vinegar","Balsamic Vinegar","Kefir","Kimchi","Kombucha (Unsweetened)","Sauerkraut","Yogurt (Fermented)"],
+      "Other Ingredients": ["GPT CHOOES OTHER (EGGS, COFFEE, TEA, HONEY, OTHERS)","Cacao","Capers","Coffee","Eggs","Green Tea","Honey","Kombucha (Unsweetened)","Seaweed","Soy Milk"]
+    };
+    const EXCLUDE_CATEGORIES = Object.keys(STARTER_INGREDIENTS);
+    const GOALS = [
+      "General Cognitive Health",
+      "Weight Loss / Metabolic Health",
+      "Blood Sugar Control (Low GI/GL)",
+      "Cardiovascular Support (Low Sodium / Healthy Fats)",
+      "Sleep Support",
+      "Anti-inflammatory Focus (Lower DII)",
+      "Microbiome Support (Pre/Pro/Post-biotic)"
+    ];
+
+    // =========================
+    // HELPERS
+    // =========================
+    function el(tag, attrs={}, ...children){
+      const node = document.createElement(tag);
+      Object.entries(attrs).forEach(([k,v])=>{
+        if(k==='class') node.className = v;
+        else if(k==='for') node.setAttribute('for', v);
+        else if(k==='html') node.innerHTML = v;
+        else node.setAttribute(k,v);
+      });
+      children.forEach(c => node.append(c));
+      return node;
+    }
+    function slugify(s){ return String(s||'').toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9\-]/g,''); }
+    function toggleAccordion(header){
+      const acc = header.parentElement;
+      const content = acc.querySelector('.acc-content');
+      const open = content.classList.toggle('open');
+      header.setAttribute('aria-expanded', open ? 'true' : 'false');
+    }
+    function setStatus(msg){ const s=document.getElementById('status'); if(s) s.textContent = msg; }
+
+    // Checkbox renderer
+    function renderIncludeAccordions(){
+      const root = document.getElementById('include-root');
+      root.innerHTML = '';
+      Object.entries(STARTER_INGREDIENTS).forEach(([cat, items])=>{
+        const catSlug = slugify(cat);
+        const acc = el('div', { class:'accordion' });
+        const header = el('div', { class:'acc-header', role:'button', tabindex:'0', 'aria-expanded':'false', onclick:'toggleAccordion(this)' },
+          el('h4', {}, cat),
+          el('span', { class:'muted' }, 'Click to expand')
+        );
+        const content = el('div', { class:'acc-content' });
+        const list = el('div', { class:'checks' });
+        items.forEach(val=>{
+          const id = `inc-${catSlug}-${slugify(val)}`;
+          const input = el('input', { type:'checkbox', id, value:val, 'data-cat':catSlug });
+          const label = el('label', { for:id }, input, val);
+          list.appendChild(label);
+        });
+        content.appendChild(list);
+        acc.appendChild(header); acc.appendChild(content);
+        root.appendChild(acc);
+      });
     }
 
-    const titleMap = {
-      nutrition: 'Nutrition',
-      cog_other: 'Cognitive & Other Health Benefits',
-      diet_compat: 'Diet Compatibility',
-      microbiome: 'Microbiome Benefit',
-      micronutrients: 'Micronutrient Benefits'
+    function renderChecks(containerId, items){
+      const root = document.getElementById(containerId); root.innerHTML = '';
+      items.forEach(v=>{
+        const id = `${containerId}-${slugify(v)}`;
+        const input = el('input', { type:'checkbox', id, value:v });
+        const label = el('label', { for:id }, input, v);
+        root.appendChild(label);
+      });
+    }
+
+    function getSelectedByCat(){
+      const inputs = document.querySelectorAll('input[type=checkbox][data-cat]');
+      const out = {};
+      inputs.forEach(i=>{
+        const cat = i.getAttribute('data-cat');
+        if (i.checked){ (out[cat] ||= []).push(i.value); }
+      });
+      return out;
+    }
+    function getSelected(containerId){
+      const root = document.getElementById(containerId);
+      const inputs = root ? root.querySelectorAll('input[type=checkbox]:checked') : [];
+      return Array.from(inputs).map(i=>i.value);
+    }
+
+    function collectForm(){
+      const selections = {};
+      Object.keys(STARTER_INGREDIENTS).forEach(cat=>{
+        const slug = slugify(cat);
+        selections[cat] = getSelectedByCat()[slug] || [];
+      });
+      const exclusions = getSelected('exc-categories');
+      const goals = getSelected('goals');
+      return { selections, exclusions, goals };
+    }
+    function buildPreviewText(data){
+      const parts = [];
+      for (const [cat, list] of Object.entries(data.selections)) {
+        if (list && list.length) parts.push(`${cat}: ${list.join(', ')}`);
+      }
+      if (data.exclusions?.length) parts.push(`Exclude categories: ${data.exclusions.join(', ')}`);
+      if (data.goals?.length) parts.push(`Goals: ${data.goals.join(', ')}`);
+      return parts.length ? parts.join('\n') : 'No selections yet.';
+    }
+
+    // =========================
+    // OPENAI VIA NETLIFY FUNCTION
+    // =========================
+    async function callOpenAI(messages){
+      const resp = await fetch(CFG.generateEndpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ messages, temperature: 0.4, max_tokens: 1200, model: 'gpt-4o-mini' })
+      });
+      const data = await resp.json();
+      if (!resp.ok) throw new Error(data?.error || ('HTTP '+resp.status));
+      return data?.content || '';
+    }
+
+    // =========================
+    // CSV LOADING & MERGE (used only if CFG.enableNutrition = true)
+    // =========================
+    const DATA = { loaded:false, byKey:Object.create(null) };
+    function norm(s){ return String(s||'').trim().toLowerCase(); }
+    function first(obj, names){ for (const n of names){ if (n in obj && obj[n]!=null && obj[n]!=='' ) return obj[n]; } }
+    function pickKey(row){ return first(row,['Ingredient','Food','Item','Name']); }
+    function applyMap(target, row, map){
+      for (const [canon, options] of Object.entries(map)){
+        const val = first(row, options);
+        if (val!=null && val!=='') target[canon] = val;
+      }
+    }
+    function mergeRow(target, row){
+      if (!target.Ingredient) target.Ingredient = first(row, ['Ingredient','Food','Item','Name']);
+      if (row.Calories!=null && row.Calories!=='') target.Calories = row.Calories;
+    }
+    const FILE_MAP = {
+      protein:       { maps:{ Protein_g:['Protein (g)','Protein_g','Protein','g_protein'] } },
+      fiber:         { maps:{ Fiber_g:['Fiber (g)','Fiber_g','Fiber','g_fiber'] } },
+      gi_gl:         { maps:{ GI:['GI','Glycemic Index'], GL:['GL','Glycemic Load'] } },
+      microbiome:    { maps:{ MicrobiomeScore:['Microbiome Benefit Score','Microbiome Benefit','Microbiome_Score'] } },
+      micronutrients_food:{ maps:{ Micronutrients:['Key Micronutrients','Micronutrients','Top Micronutrients'] } },
+      categories:    { maps:{ DietTags:['Diet Tags','Tags','Category','Categories'] } },
+      diet_tool:     { maps:{ DII:['DII Score','Anti-Inflammatory/DII Score (lower is better)','DII','anti_inflammatory_dii'] } },
+      moder:         { maps:{ DII:['DII Score','Anti-Inflammatory/DII Score (lower is better)','DII','anti_inflammatory_dii'] } },
+      main:          { maps:{ Calories:['Calories','kcal'], Protein_g:['Protein (g)','Protein_g'], Fiber_g:['Fiber (g)','Fiber_g'], GI:['GI'], GL:['GL'], Micronutrients:['Key Micronutrients'], MicrobiomeScore:['Microbiome Benefit Score'], DietTags:['Diet Tags'], DII:['DII Score'] } }
     };
-    out.appendChild(renderTable(titleMap[tableKey]||tableKey, headers, tableRows));
-  }
-}
+    async function loadCSV(path){
+      return new Promise((resolve,reject)=>{
+        Papa.parse(path, { download:true, header:true, dynamicTyping:true, skipEmptyLines:true,
+          complete:(res)=>resolve(res.data), error:reject });
+      });
+    }
+    async function ensureDataLoaded(){
+      if (!CFG.enableNutrition) return;  // skip entirely when disabled
+      if (DATA.loaded) return;
+      const order = ['main','protein','fiber','gi_gl','microbiome','micronutrients_food','categories','diet_tool','moder'];
+      for (const key of order){
+        const path = CFG.datasets[key];
+        if (!path) continue;
+        const rows = await loadCSV(path);
+        for (const row of rows){
+          const k = pickKey(row); if (!k) continue;
+          const id = norm(k);
+          const rec = (DATA.byKey[id] ||= {});
+          mergeRow(rec, row);
+          const m = FILE_MAP[key];
+          if (m) applyMap(rec, row, m.maps||{});
+        }
+      }
+      DATA.loaded = true;
+    }
+    function getSelectedIngredients(form){
+      const picked = [];
+      for (const [cat, list] of Object.entries(form.selections)){
+        (list||[]).forEach(name=>{
+          if (!/^GPT CHOOSES/i.test(name)) picked.push(name);
+        });
+      }
+      return picked;
+    }
+    function getRowsFor(ingredients){
+      const rows = [];
+      for (const name of ingredients){
+        const rec = DATA.byKey[norm(name)];
+        if (rec) rows.push({ Ingredient: rec.Ingredient || name, ...rec });
+      }
+      return rows;
+    }
+    function renderNutritionTable(rows){
+      const box = document.getElementById('nutrition-root');
+      if (!CFG.enableNutrition){ box.style.display='none'; box.innerHTML=''; return; }
+      box.style.display='block';
+      box.innerHTML = '';
+      if (!rows.length){
+        box.appendChild(el('p',{class:'muted'},'No nutrition data found for your selections.'));
+        return;
+      }
+      const table = el('table', {});
+      const thead = el('thead', {});
+      thead.appendChild(el('tr', {},
+        el('th', {}, 'Ingredient'),
+        el('th', {}, 'Calories'),
+        el('th', {}, 'Protein (g)'),
+        el('th', {}, 'Fiber (g)'),
+        el('th', {}, 'GI'),
+        el('th', {}, 'GL'),
+        el('th', {}, 'Anti-Inflammatory/DII Score (lower is better)'),
+        el('th', {}, 'Key Micronutrients'),
+        el('th', {}, 'Microbiome Benefit Score'),
+        el('th', {}, 'Diet Tags')
+      ));
+      const tbody = el('tbody', {});
+      rows.forEach(r=>{
+        tbody.appendChild(el('tr', {},
+          el('td', {}, r.Ingredient ?? '—'),
+          el('td', {class:'num'}, r.Calories ?? '—'),
+          el('td', {class:'num'}, r.Protein_g ?? '—'),
+          el('td', {class:'num'}, r.Fiber_g ?? '—'),
+          el('td', {class:'num'}, r.GI ?? '—'),
+          el('td', {class:'num'}, r.GL ?? '—'),
+          el('td', {}, r.DII ?? '—'),
+          el('td', {}, r.Micronutrients ?? '—'),
+          el('td', {}, r.MicrobiomeScore ?? '—'),
+          el('td', {}, r.DietTags ?? '—')
+        ));
+      });
+      table.appendChild(thead); table.appendChild(tbody);
+      box.appendChild(table);
+    }
+    function coachingFromGoals(goals){
+      const tips = [];
+      if (goals.includes("Blood Sugar Control (Low GI/GL)")) tips.push("Favor legumes, intact whole grains, berries; pair carbs with protein/fiber; target GL < 10 per dish.");
+      if (goals.includes("Anti-inflammatory Focus (Lower DII)")) tips.push("Emphasize polyphenol-rich produce, EVOO, nuts, fermented foods; minimize UPFs/processed meats.");
+      if (goals.includes("Cardiovascular Support (Low Sodium / Healthy Fats)")) tips.push("Aim for ≤ 500–600 mg sodium/meal; choose omega-3 fish and EVOO; avoid deep-fried items.");
+      if (goals.includes("Microbiome Support (Pre/Pro/Post-biotic)")) tips.push("Include fermented foods and prebiotic fibers (onion, garlic, legumes, oats).");
+      if (goals.includes("Weight Loss / Metabolic Health")) tips.push("Center plates on vegetables + lean protein; keep energy density low; prioritize fiber and protein.");
+      if (goals.includes("Sleep Support")) tips.push("Consider magnesium-rich greens, kiwi, tart cherry; avoid late heavy meals and stimulants.");
+      return tips;
+    }
 
-document.getElementById('btn_build').addEventListener('click', build);
-document.getElementById('btn_clear').addEventListener('click', ()=>{
-  document.getElementById('ingredients_input').value='';
-  document.getElementById('parsed').innerHTML='';
-  document.getElementById('warnings').innerHTML='';
-  document.getElementById('tables').innerHTML='';
-});
+    // =========================
+    // PUBLIC HANDLERS
+    // =========================
+    async function generateFromCustom(){
+      setStatus('');
+      const out = document.getElementById('custom-output');
+      const custom = document.getElementById('custom-input').value.trim();
+      const num = parseInt(document.getElementById('num-recipes').value, 10);
+      const count = Number.isFinite(num) ? num : undefined;
 
-(async ()=>{
-  try{
-    const s = await loadSettings();
-    const m = await loadMappings();
-    document.getElementById('status').innerHTML = `<div>Join key: <b>${s.joinKey}</b> (aliases: ${s.joinKeyAliases.join(', ')})</div>
-      <div>Whitelist files: <b>${s.whitelist.join(', ')}</b></div>
-      <div>Mapping files missing: ${m.missing.length? m.missing.join(', '): '<span class=ok>none</span>'}</div>`;
-  }catch(e){ document.getElementById('status').innerHTML = `<span class=bad>Failed to read status: ${e.message}</span>`; }
-})();
-</script>
+      const sys = `You are BrainPreserve’s recipe engine. Generate brain-healthy recipes with clear headings, MIND/Mediterranean alignment, minimized added sugars and ultra-processed foods, reasonable sodium, and a short coaching suggestions section tailored to the request.`;
+      const user = `${count ? `Generate ${count} recipes.` : 'Generate 3–5 recipes.'}
+Request: ${custom || 'Chef’s choice within brain-healthy constraints.'}`;
+
+      out.textContent = 'Generating...';
+      try{
+        const text = await callOpenAI([{ role:'system', content: sys }, { role:'user', content: user }]);
+        out.textContent = text || '(no text)';
+      }catch(err){ out.textContent = 'Error: ' + err.message; }
+    }
+
+    function clearCustomSection(){
+      document.getElementById('custom-input').value = '';
+      document.getElementById('num-recipes').value = '';
+      document.getElementById('custom-output').textContent = '';
+    }
+
+    function clearFormSelections(){
+      document.querySelectorAll('.checks input[type=checkbox]').forEach(i => { i.checked = false; });
+      document.getElementById('form-preview').textContent = 'No selections yet.';
+      renderNutritionTable([]); // also hides when disabled
+      const out = document.getElementById('form-output'); if (out) out.textContent = '';
+      setStatus('');
+    }
+
+    async function generateFromSelections(){
+      setStatus('Working…');
+
+      const form = collectForm();
+      document.getElementById('form-preview').textContent = buildPreviewText(form);
+
+      const out = document.getElementById('form-output') || document.createElement('pre');
+      if (!out.id){ out.id='form-output'; out.className='card'; document.querySelector('main').appendChild(out); }
+      out.textContent = 'Generating...';
+
+      try {
+        const selLines = Object.entries(form.selections)
+          .filter(([, list]) => list && list.length)
+          .map(([k, list]) => `${k}: ${list.join(', ')}`)
+          .join('\n');
+        const exc = form.exclusions?.length ? `Exclude categories: ${form.exclusions.join(', ')}` : '';
+        const goals = form.goals?.length ? `Goals: ${form.goals.join(', ')}` : '';
+
+        const sys = `You are BrainPreserve’s recipe engine. Use the provided selections, respect exclusions strictly, and tailor to the listed goals. Return 3–5 recipes with clear headings and a brief goal-aligned coaching section (e.g., lower GI/GL for blood sugar, anti-inflammatory emphasis, microbiome-supportive ferments and fibers).`;
+        const user = `Selections:
+${selLines || '(none)'}
+${exc}
+${goals}`;
+
+        // 1) Recipe text
+        const text = await callOpenAI([{ role:'system', content: sys }, { role:'user', content: user }]);
+        out.textContent = text || '(no text)';
+
+        // 2) Nutrition & coaching (only if enabled)
+        await ensureDataLoaded();
+        const picked = getSelectedIngredients(form);
+        const rows = CFG.enableNutrition ? getRowsFor(picked) : [];
+        renderNutritionTable(rows);
+
+        const tips = coachingFromGoals(form.goals || []);
+        const nroot = document.getElementById('nutrition-root');
+        if (CFG.enableNutrition) nroot.appendChild(el('div', { class:'card', style:'margin-top:12px' },
+            el('h4', {}, 'Goal-Aligned Coaching (deterministic rules)'),
+            el('ul', {}, ...tips.map(t=>el('li', {}, t)))
+        ));
+        setStatus('Done.');
+      } catch(err){
+        out.textContent = '';
+        const errBox = el('div',{class:'error'}, 'Error during generation: ', String(err?.message || err));
+        out.replaceWith(errBox);
+        errBox.id='form-output';
+        console.error(err);
+        setStatus('Error.');
+      }
+    }
+
+    // =========================
+    // INIT UI
+    // =========================
+    (function init(){
+      renderIncludeAccordions();
+      renderChecks('exc-categories', EXCLUDE_CATEGORIES);
+      renderChecks('goals', GOALS);
+
+      document.body.addEventListener('change', (e)=>{
+        if(e.target.closest('.checks')){
+          const form = collectForm();
+          document.getElementById('form-preview').textContent = buildPreviewText(form);
+        }
+      });
+
+      // Hide nutrition area initially if feature disabled
+      renderNutritionTable([]);
+    })();
+
+    // Export handlers
+    window.generateFromSelections = generateFromSelections;
+    window.generateFromCustom     = generateFromCustom;
+    window.clearFormSelections    = clearFormSelections;
+    window.clearCustomSection     = clearCustomSection;
+    window.toggleAccordion        = toggleAccordion;
+  </script>
 </body>
 </html>
